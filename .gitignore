@@ -9,3 +9,6 @@ test-results/
 reference/
 generated_images/
 *.bundle
+
+.playwright-cli/
+output/playwright/

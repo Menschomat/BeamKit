@@ -22,8 +22,8 @@ test('settings round-trip and reject invalid numbers and future revisions', () =
   assert.equal(JSON.parse(encoded).format, 'beamkit-grid-prototype');
   assert.deepEqual(decodeProject(encoded), defaultGrid);
   assert.deepEqual(decodeProject(encoded.replace('beamkit-grid-prototype', 'lightform-grid-prototype')), defaultGrid);
-  assert.throws(() => decodeProject(encoded.replace('"depth": 12', '"depth": "12"')), /Depth/);
-  assert.throws(() => decodeProject(encoded.replace('"schemaVersion": 1', '"schemaVersion": 2')), /supported/);
+  assert.throws(() => decodeProject(encoded.replace('"depth": 12', '"depth": "12"')), /depth/);
+  assert.throws(() => decodeProject(encoded.replace('"schemaVersion": 1', '"schemaVersion": 2')), /[Uu]nsupported/);
 });
 
 test('binary STL preserves millimetre coordinates and the output dedication', () => {
@@ -50,4 +50,15 @@ test('procedural reference includes the inset, rear seam, and schematic side mar
   assert.ok(port.every((point) => point[1] === -30));
   assert.ok(control.every((point) => point[1] === 30));
   assert.equal(segments.length, 8);
+});
+
+
+test('project imports reject unknown fields, revisions, and oversized files', () => {
+  const project = JSON.parse(encodeProject(defaultGrid));
+  assert.throws(() => decodeProject(JSON.stringify({ ...project, script: 'ignored?' })), /Unrecognized/);
+  project.attachment.parameters.extra = 1;
+  assert.throws(() => decodeProject(JSON.stringify(project)), /Unrecognized/);
+  assert.throws(() => decodeProject(' '.repeat(65537)), /too large/);
+  project.lamp.revision = 2;
+  assert.throws(() => decodeProject(JSON.stringify(project)), /lamp.revision/);
 });

@@ -1,6 +1,6 @@
 # Lamp Attachment Designer — Project Plan
 
-Status: implementation started
+Status: implementation in progress; see docs/VALIDATION.md for evidence and remaining gates
 Date: 2026-11-21
 First supported lamp: SmallRig Vibe P96L
 
