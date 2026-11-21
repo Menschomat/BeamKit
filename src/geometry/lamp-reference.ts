@@ -9,7 +9,7 @@ export type LampReference = {
   detail: {
     rearSeamFromBack: number;
     markers: readonly {
-      side: 'front-edge' | 'back-edge';
+      side: 'front-edge' | 'back-edge' | 'left-edge';
       centerX: number;
       centerZ: number;
       width: number;
@@ -30,7 +30,8 @@ export function lampReferenceLines({ body, aperture, detail }: LampReference) {
     onPlane(aperture, 0),
     ...detail.markers.map(({ side, centerX, centerZ, ...shape }): Point3[] => {
       const edge = side === 'front-edge' ? -body.height / 2 : body.height / 2;
-      return roundedOutline(shape).map(([x, z]) => [centerX + x, edge, centerZ + z]);
+      return roundedOutline(shape).map(([x, z]) => side === 'left-edge'
+        ? [-body.width / 2, centerX + x, centerZ + z] : [centerX + x, edge, centerZ + z]);
     }),
   ];
   const segments: Point3[] = outline.filter((_, index) => index % 9 === 0)

@@ -1,6 +1,6 @@
 # Lamp Attachment Designer — Project Plan
 
-Status: implementation in progress; see docs/VALIDATION.md for evidence and remaining gates
+Status: integrated P96L editor implemented locally. See docs/VALIDATION.md for remaining release gates.
 Date: 2026-11-21
 First supported lamp: SmallRig Vibe P96L
 

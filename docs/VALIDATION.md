@@ -1,63 +1,31 @@
-# Implementation and validation report
+# Implementation and validation
 
-Date: 2026-11-21. This is an implementation checkpoint, not a completed release.
+The local editor supports two integrated P96L accessories, the honeycomb and
+diffusion sheet holder. Its default STL is one connected solid in millimetres,
+oriented front-face down. The optional fit coupon lives under Advanced test tools.
+The latest mount revision replaces most of the right wall with two spring tabs.
+It includes four front seats and access cutouts based on the reference dimensions.
+Earlier project revisions remain supported, with an explicit upgrade action.
 
-## Implemented
+The default honeycomb is 113.8 × 63.8 × 28.5 mm and uses 27,024 mm³ of solid
+geometry, about 4.1% less than the initial 28,178 mm³ integrated design. The two
+presets have a maximum downward slope of about 43.92° from vertical outside bed
+contact, with zero triangles flagged above 45°. The holder’s deeper sheet pocket
+and tapered seat use more geometric volume than the original prototype holder.
+These checks measure mesh geometry. Slicer toolpaths and real print behavior
+remain to be checked. See [print tests](PRINT_TESTS.md).
 
-- Original procedural P96L reference and a standalone parametric honeycomb.
-- UI-independent Manifold generator used by the worker and real-kernel tests.
-- Solid status, positive volume, finite vertices, and connected-component validation.
-- Strict versioned project validation with Zod and a published `public/project.schema.json`.
-- Explicit compatibility migration for the original Lightform prototype name.
-- Undo/redo, preset reset, named IndexedDB projects, and debounced autosave.
-- Generation retry, stale-response protection, and export gating.
-- Production service worker precaches the shell, geometry worker, and local WASM.
-- Prompted update action saves the design before activation.
-- Dependency versions and lockfile, plus a production Playwright workflow.
+| Plan milestone | Evidence and remaining gate |
+| --- | --- |
+| Geometry feasibility | Manifold 3.5.5 generates closed, connected solids with clear access volumes. The benchmark records assembly, STL and alternative subtraction timings. Node RSS grew across 600 builds. The browser recycles its worker after 32 successful builds to bound the lifetime of each WASM heap. Long-session browser memory and Bambu Studio import remain to be checked. |
+| Domain and projects | Typed catalogue, versioned strict JSON, legacy migration and confirmation before replacement. Geometry runs independently of the UI. |
+| Editor | Parametric integrated geometry, local history, responsive panels, section and print views, and validated STL and ZIP downloads. The private CAD files are ignored and excluded from built assets. |
+| Physical fit and modular connection | Actual fit, click force, retention, fatigue, heat and optics require hardware. Modular output remains gated on tested mechanical fit. |
+| Offline | Chromium workflow, full restart and two production builds with a prompted update. Core WebKit workflows are covered. Native Safari installation and platform storage eviction remain to be checked. |
+| Expansion | A second attachment and synthetic lamp fixture exercise the geometry. A second independently measured lamp is deferred. |
+| Release | CI, build asset checks and Cloudflare Pages preparation are in place. Deployed-origin checks require an authorized deployment. |
 
-## Evidence
-
-Node 24.15.0 on macOS, Manifold 3.5.5 (see lockfile for exact dependency resolution).
-Real-kernel tests cover minimum, default, and maximum grid settings: expected
-bounds within 0.001 mm, positive oriented volume, two incident triangles per
-mesh edge, one connected solid, and binary STL size.
-
-A 24-rebuild default-grid benchmark including STL serialization measured roughly
-6 ms median on this machine. Process RSS stayed around 136 MB after warmup;
-this short observation does not prove absence of browser/WASM memory leaks.
-
-The production Chromium workflow checks generation, parameter edits, JSON download
-and reimport, atomic invalid import, undo/redo, STL download, autosave restoration,
-and generation after offline reload. Run `npm run build` before `npm run test:browser`.
-A visible installed-Chrome session also opened the editor with a ready grid and
-no console errors. This is not a Safari check.
-
-## Remaining gates
-
-Milestone 0 remains open: inspect scale and open cells in Bambu Studio, benchmark
-mount union and an alternative subtraction algorithm, and measure longer-running
-browser resource behavior. Current timings cover the standalone grid only.
-
-Milestones 1 and 2 remain partial: full lamp/mount/connection/attachment registries,
-the general assembly project schema, collar/retention geometry, aperture inset,
-orientation, import summary, and integrated fit-test exports are still pending.
-The published schema deliberately describes only the existing grid prototype.
-
-Milestone 3 requires actual lamp measurements, explicit control/port/screw keepouts,
-material/nozzle selection, sliced-output inspection, and physical fit/retention
-trials before defining a modular connection. Current schematic markers are not
-fit keepouts. Heat and optical performance remain unverified.
-
-Milestone 4 remains partial: cross-build update behavior, Safari, full browser
-restart, maskable raster icons, install guidance, and quota failure testing need
-verification. The offline test covers reload in a running Chromium context.
-
-Milestones 5 and 6 remain open: independently measured second lamp, second
-attachment, extension guide, release/deployment validation. Nothing was published
-or deployed.
-
-Dependency audit reported three moderate build-tool advisories in Workbox's
-transitive glob/minimatch dependencies. A compatible `npm audit fix` did not
-resolve them. Recheck before release; no forced major dependency overrides were
-applied. Production builds also report a large application chunk and harmless
-third-party annotation / Node-externalization warnings.
+The authorized dependency audit reported three moderate entries in the Workbox
+build dependency chain. See the [editor design review](DESIGN_REVIEW.md) for
+the taste gate results. The gate remained open with 37 findings, including
+marketing layout requirements that conflict with the editor workspace.

@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "beamkit-grid-prototype"
+    },
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "units": {
+      "type": "string",
+      "const": "mm"
+    },
+    "lamp": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "const": "smallrig.p96l"
+        },
+        "revision": {
+          "type": "number",
+          "const": 1
+        }
+      },
+      "required": [
+        "id",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "attachment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "const": "honeycomb"
+        },
+        "revision": {
+          "type": "number",
+          "const": 1
+        },
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "opening": {
+              "type": "number",
+              "minimum": 2,
+              "maximum": 15
+            },
+            "depth": {
+              "type": "number",
+              "minimum": 2,
+              "maximum": 35
+            },
+            "wall": {
+              "type": "number",
+              "minimum": 0.4,
+              "maximum": 2
+            },
+            "frame": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "opening",
+            "depth",
+            "wall",
+            "frame"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "parameters"
+      ],
+      "additionalProperties": false
+    },
+    "outputLicense": {
+      "type": "string",
+      "const": "CC0-1.0"
+    }
+  },
+  "required": [
+    "format",
+    "schemaVersion",
+    "units",
+    "lamp",
+    "attachment",
+    "outputLicense"
+  ],
+  "additionalProperties": false
+}

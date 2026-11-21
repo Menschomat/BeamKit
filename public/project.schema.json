@@ -4,7 +4,7 @@
   "properties": {
     "format": {
       "type": "string",
-      "const": "beamkit-grid-prototype"
+      "const": "lamp-attachment-project"
     },
     "schemaVersion": {
       "type": "number",
@@ -14,16 +14,49 @@
       "type": "string",
       "const": "mm"
     },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "engine": {
+      "type": "object",
+      "properties": {
+        "generatorVersion": {
+          "type": "string",
+          "enum": [
+            "0.2.0",
+            "0.3.0"
+          ]
+        },
+        "kernel": {
+          "type": "string",
+          "const": "manifold"
+        },
+        "kernelVersion": {
+          "type": "string",
+          "const": "3.5.5"
+        }
+      },
+      "required": [
+        "generatorVersion",
+        "kernel",
+        "kernelVersion"
+      ],
+      "additionalProperties": false
+    },
     "lamp": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "const": "smallrig.p96l"
+          "minLength": 1,
+          "maxLength": 100
         },
         "revision": {
-          "type": "number",
-          "const": 1
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -32,48 +65,64 @@
       ],
       "additionalProperties": false
     },
+    "mount": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "revision": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "parameters": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "number"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "parameters"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "attachment": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "const": "honeycomb"
+          "minLength": 1,
+          "maxLength": 100
         },
         "revision": {
-          "type": "number",
-          "const": 1
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
         },
         "parameters": {
           "type": "object",
-          "properties": {
-            "opening": {
-              "type": "number",
-              "minimum": 2,
-              "maximum": 15
-            },
-            "depth": {
-              "type": "number",
-              "minimum": 2,
-              "maximum": 35
-            },
-            "wall": {
-              "type": "number",
-              "minimum": 0.4,
-              "maximum": 2
-            },
-            "frame": {
-              "type": "number",
-              "minimum": 1,
-              "maximum": 5
-            }
+          "propertyNames": {
+            "type": "string"
           },
-          "required": [
-            "opening",
-            "depth",
-            "wall",
-            "frame"
-          ],
-          "additionalProperties": false
+          "additionalProperties": {
+            "type": "number"
+          }
         }
       },
       "required": [
@@ -83,18 +132,94 @@
       ],
       "additionalProperties": false
     },
-    "outputLicense": {
-      "type": "string",
-      "const": "CC0-1.0"
+    "assembly": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "integrated",
+            "fit-test",
+            "standalone"
+          ]
+        },
+        "connection": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "mode",
+        "connection"
+      ],
+      "additionalProperties": false
+    },
+    "printProfile": {
+      "type": "object",
+      "properties": {
+        "printer": {
+          "type": "string",
+          "const": "bambu-lab"
+        },
+        "nozzleDiameterMm": {
+          "type": "number",
+          "const": 0.4
+        },
+        "material": {
+          "type": "string",
+          "enum": [
+            "unspecified",
+            "PLA",
+            "PETG",
+            "ASA"
+          ]
+        }
+      },
+      "required": [
+        "printer",
+        "nozzleDiameterMm",
+        "material"
+      ],
+      "additionalProperties": false
+    },
+    "export": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "const": "stl"
+        },
+        "quality": {
+          "type": "string",
+          "const": "print"
+        },
+        "orientation": {
+          "type": "string",
+          "enum": [
+            "front-down",
+            "assembly"
+          ]
+        }
+      },
+      "required": [
+        "format",
+        "quality",
+        "orientation"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
     "format",
     "schemaVersion",
     "units",
+    "name",
+    "engine",
     "lamp",
+    "mount",
     "attachment",
-    "outputLicense"
+    "assembly",
+    "printProfile",
+    "export"
   ],
   "additionalProperties": false
 }

@@ -1,0 +1,52 @@
+{
+  "format": "lamp-attachment-project",
+  "schemaVersion": 1,
+  "units": "mm",
+  "name": "P96L honeycomb",
+  "engine": {
+    "generatorVersion": "0.2.0",
+    "kernel": "manifold",
+    "kernelVersion": "3.5.5"
+  },
+  "lamp": {
+    "id": "smallrig.p96l",
+    "revision": 1
+  },
+  "mount": {
+    "id": "smallrig.p96l.collar",
+    "revision": 1,
+    "parameters": {
+      "fitClearancePerSideMm": 0.3,
+      "engagementMm": 12.5,
+      "supportThicknessMm": 1.6,
+      "diffuserClearanceMm": 0.8,
+      "retainingLipMm": 0.4,
+      "accessCutoutWidthMm": 76
+    }
+  },
+  "attachment": {
+    "id": "honeycomb",
+    "revision": 2,
+    "parameters": {
+      "opening": 6,
+      "depth": 12,
+      "wall": 0.8,
+      "frame": 2,
+      "inset": 0,
+      "orientation": 0
+    }
+  },
+  "assembly": {
+    "mode": "integrated",
+    "connection": null
+  },
+  "printProfile": {
+    "printer": "bambu-lab",
+    "nozzleDiameterMm": 0.4,
+    "material": "unspecified"
+  },
+  "export": {
+    "format": "stl",
+    "quality": "print"
+  }
+}

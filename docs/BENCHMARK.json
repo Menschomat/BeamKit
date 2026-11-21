@@ -1,0 +1,91 @@
+{
+  "date": "2026-11-21T11:26:16.843Z",
+  "runtime": "v24.15.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "kernelVersion": "3.5.5",
+  "workload": "P96L corner clipping + access-cut collar union + validated final mesh + STL",
+  "runs": 600,
+  "medianMs": 23.022415999999794,
+  "maxMs": 53.491208,
+  "triangles": 5704,
+  "rssWarmupBytes": 152829952,
+  "rssFinalBytes": 315588608,
+  "memorySamples": [
+    {
+      "run": 0,
+      "rssBytes": 125042688,
+      "heapUsedBytes": 12255200,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 50,
+      "rssBytes": 147521536,
+      "heapUsedBytes": 12675880,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 100,
+      "rssBytes": 187596800,
+      "heapUsedBytes": 12736104,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 150,
+      "rssBytes": 193380352,
+      "heapUsedBytes": 12743416,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 200,
+      "rssBytes": 199032832,
+      "heapUsedBytes": 12752712,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 250,
+      "rssBytes": 204750848,
+      "heapUsedBytes": 12766048,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 300,
+      "rssBytes": 210419712,
+      "heapUsedBytes": 12774456,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 350,
+      "rssBytes": 216121344,
+      "heapUsedBytes": 12776512,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 400,
+      "rssBytes": 288931840,
+      "heapUsedBytes": 12787192,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 450,
+      "rssBytes": 294830080,
+      "heapUsedBytes": 12787576,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 500,
+      "rssBytes": 301383680,
+      "heapUsedBytes": 12778112,
+      "arrayBufferBytes": 121123
+    },
+    {
+      "run": 550,
+      "rssBytes": 307134464,
+      "heapUsedBytes": 12825048,
+      "arrayBufferBytes": 121123
+    }
+  ],
+  "batchedSolidSubtractionGridOnlyMs": 60.95341600000029,
+  "clipped2dGridOnlyMs": 5.618582999999489,
+  "decision": "Keep shared 2D walls clipped before extrusion; solid subtraction is correct but adds avoidable solids and allocations."
+}

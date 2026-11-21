@@ -12,3 +12,8 @@ generated_images/
 
 .playwright-cli/
 output/playwright/
+
+# Private third-party lamp reference; never bundle or export.
+/etc/SmallRig Vibe P96L Light - 7402666/
+
+.taste-skill/

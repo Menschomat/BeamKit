@@ -1,101 +1,101 @@
 import {
-  AmbientLight, Box3, BufferAttribute, BufferGeometry, Color, DirectionalLight,
-  GridHelper, Group, LineBasicMaterial, LineLoop, LineSegments, Mesh,
-  MeshStandardMaterial, PerspectiveCamera, Scene, Vector3, WebGLRenderer,
+  AmbientLight, Box3, BoxGeometry, BufferAttribute, BufferGeometry, Color, DirectionalLight,
+  EdgesGeometry, GridHelper, Group, LineBasicMaterial, LineLoop, LineSegments, Mesh,
+  MeshStandardMaterial, PerspectiveCamera, Plane, Scene, Vector3, WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { p96l } from './catalog/p96l.ts';
+import { lamps } from './catalog/registry.ts';
 import { lampReferenceLines } from './geometry/lamp-reference.ts';
-import type { GridMesh } from './geometry/protocol.ts';
-
+import type { AssemblyResult } from './generators/assembly.ts';
+export type ViewOptions = { mode: 'assembly' | 'part' | 'section' | 'print'; lampVisible: boolean; keepoutsVisible: boolean; lampOpacity: number };
 export function createViewport(host: HTMLElement) {
   const renderer = new WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.localClippingEnabled = true;
   host.append(renderer.domElement);
-  const scene = new Scene();
-  scene.background = new Color('#E7E7E7');
-  const camera = new PerspectiveCamera(36, 1, 1, 1500);
-  camera.up.set(0, 0, 1);
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.maxDistance = 500;
-  controls.minDistance = 30;
-
-  const floor = new GridHelper(300, 30, '#bdbdc1', '#d2d2d4');
-  floor.rotation.x = Math.PI / 2;
-  floor.position.z = -14;
-  scene.add(floor, new AmbientLight(0xffffff, 1.8));
-  const light = new DirectionalLight(0xffffff, 2.8);
-  light.position.set(-40, -50, 100);
-  scene.add(light);
-
+  const scene = new Scene(); scene.background = new Color('#ececef');
+  const camera = new PerspectiveCamera(34, 1, 0.1, 2000); camera.up.set(0, 0, 1);
+  const controls = new OrbitControls(camera, renderer.domElement); controls.maxDistance = 600; controls.minDistance = 35;
+  const floor = new GridHelper(350, 35, '#c9c9cd', '#dfdfe3'); floor.rotation.x = Math.PI / 2; floor.position.z = -16;
+  scene.add(floor, new AmbientLight(0xffffff, 2.1));
+  const light = new DirectionalLight(0xffffff, 3.2); light.position.set(-40, -90, 180); scene.add(light);
+  const rim = new DirectionalLight(0xffffff, 1.2); rim.position.set(60, 40, 30); scene.add(rim);
   const lamp = new Group();
-  const lines = new LineBasicMaterial({ color: '#64646c' });
-  const reference = lampReferenceLines(p96l);
-  for (const loop of reference.loops) {
-    const points = loop.map(([x, y, z]) => new Vector3(x, y, z));
-    lamp.add(new LineLoop(new BufferGeometry().setFromPoints(points), lines));
-  }
-  const uprights = reference.segments.map(([x, y, z]) => new Vector3(x, y, z));
-  lamp.add(new LineSegments(new BufferGeometry().setFromPoints(uprights), lines));
+  const lines = new LineBasicMaterial({ color: '#6d747b', transparent: true, opacity: 0.35 });
+  const reference = lampReferenceLines(lamps[0]);
+  for (const loop of reference.loops) lamp.add(new LineLoop(new BufferGeometry().setFromPoints(loop.map(p => new Vector3(...p))), lines));
+  lamp.add(new LineSegments(new BufferGeometry().setFromPoints(reference.segments.map(p => new Vector3(...p))), lines));
   scene.add(lamp);
-
-  const grid = new Mesh(new BufferGeometry(), new MeshStandardMaterial({
-    color: '#3d3d43', roughness: 0.78,
-  }));
-  scene.add(grid);
-
+  const keepouts = new Group(); const keepoutMaterial = new LineBasicMaterial({ color: '#c04c39', transparent: true, opacity: 0.65 });
+  for (const { bounds } of lamps[0].keepouts) {
+    const dimensions = bounds.max.map((v, i) => v - bounds.min[i]);
+    const cube = new BoxGeometry(...dimensions as [number, number, number]);
+    const line = new LineSegments(new EdgesGeometry(cube), keepoutMaterial); cube.dispose();
+    line.position.set(...bounds.min.map((v, i) => (v + bounds.max[i]) / 2) as [number, number, number]); keepouts.add(line);
+  }
+  keepouts.visible = false; scene.add(keepouts);
+  const partGroup = new Group(); scene.add(partGroup);
+  const material = new MeshStandardMaterial({ color: '#62666b', roughness: 0.8, metalness: 0.01, flatShading: true });
+  const cutPlane = new Plane(new Vector3(0, -1, 0), 0);
+  let displayed: AssemblyResult | null = null;
   const render = () => renderer.render(scene, camera);
   controls.addEventListener('change', render);
   const resize = new ResizeObserver(() => {
-    const width = Math.max(1, host.clientWidth);
-    const height = Math.max(1, host.clientHeight);
-    renderer.setSize(width, height);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    render();
-  });
-  resize.observe(host);
-
-  function fit() {
-    const bounds = new Box3();
-    if (lamp.visible) bounds.expandByObject(lamp);
-    if (grid.geometry.index) bounds.expandByObject(grid);
-    const center = new Vector3();
-    bounds.getCenter(center);
-    const extent = bounds.getSize(new Vector3()).length() || 125;
-    const distance = extent / (2 * Math.tan(18 * Math.PI / 180) * Math.min(camera.aspect, 1));
-    camera.position.copy(center).addScaledVector(new Vector3(0.7, -1, 0.85).normalize(), distance);
-    controls.target.copy(center);
-    controls.update();
-    render();
+    const width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight);
+    renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix(); fit();
+  }); resize.observe(host);
+  function fit(front = false) {
+    const bounds = new Box3(); if (lamp.visible) bounds.expandByObject(lamp);
+    if (partGroup.children.length) bounds.expandByObject(partGroup);
+    if (bounds.isEmpty()) bounds.setFromCenterAndSize(new Vector3(), new Vector3(115, 65, 25));
+    const center = bounds.getCenter(new Vector3());
+    const direction = front ? new Vector3(0, 0, 1) : new Vector3(0.38, -0.72, 1.25).normalize();
+    const up = front ? new Vector3(0, 1, 0) : new Vector3(0, 0, 1);
+    camera.up.copy(up);
+    const right = new Vector3().crossVectors(up, direction).normalize();
+    const screenUp = new Vector3().crossVectors(direction, right).normalize();
+    const tangent = Math.tan(17 * Math.PI / 180);
+    let distance = 30;
+    for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) {
+      const point = new Vector3(x, y, z).sub(center);
+      const towardCamera = point.dot(direction);
+      distance = Math.max(distance, Math.abs(point.dot(screenUp)) / tangent + towardCamera,
+        Math.abs(point.dot(right)) / (tangent * Math.max(camera.aspect, 0.1)) + towardCamera);
+    }
+    camera.position.copy(center).addScaledVector(direction, distance * 1.12);
+    controls.target.copy(center); controls.update(); render();
   }
+  function clearParts() { for (const mesh of partGroup.children) (mesh as Mesh).geometry.dispose(); partGroup.clear(); }
   fit();
-
   return {
     fit,
-    update(mesh: GridMesh | null, mode: 'assembly' | 'exploded' | 'grid') {
-      lamp.visible = mode !== 'grid';
-      grid.position.z = mode === 'exploded' ? 19 : 0.5;
-      grid.geometry.dispose();
-      grid.geometry = new BufferGeometry();
-      if (mesh) {
-        grid.geometry.setAttribute('position', new BufferAttribute(mesh.positions, 3));
-        grid.geometry.setIndex(new BufferAttribute(mesh.indices, 1));
-        grid.geometry.computeVertexNormals();
+    update(result: AssemblyResult | null, options: ViewOptions) {
+      lamp.visible = options.lampVisible && options.mode === 'assembly'; lines.opacity = options.lampOpacity;
+      keepouts.visible = options.keepoutsVisible && options.mode !== 'print';
+      partGroup.rotation.x = options.mode === 'print' ? Math.PI : 0;
+      partGroup.position.z = options.mode === 'print' ? Math.max(...(result?.parts.map(part => part.bounds.max[2]) ?? [0])) : 0;
+      floor.position.z = options.mode === 'print' ? -0.05 : -16;
+      const sectionActive = options.mode === 'section';
+      if (sectionActive !== Boolean(material.clippingPlanes?.length)) {
+        material.clippingPlanes = sectionActive ? [cutPlane] : [];
+        material.needsUpdate = true;
+      }
+      if (displayed !== result) {
+        const firstGeometry = displayed === null && result !== null;
+        clearParts(); displayed = result;
+        for (const part of result?.parts ?? []) {
+          const geometry = new BufferGeometry(); geometry.setAttribute('position', new BufferAttribute(part.mesh.positions, 3));
+          geometry.setIndex(new BufferAttribute(part.mesh.indices, 1)); geometry.computeVertexNormals();
+          const mesh = new Mesh(geometry, material); mesh.position.set(...part.transform); partGroup.add(mesh);
+        }
+        if (firstGeometry) fit();
       }
       render();
     },
     dispose() {
-      resize.disconnect();
-      controls.dispose();
-      lamp.children.forEach((line) => (line as LineLoop).geometry.dispose());
-      lines.dispose();
-      floor.geometry.dispose();
-      floor.material.dispose();
-      grid.geometry.dispose();
-      grid.material.dispose();
-      renderer.dispose();
-      renderer.domElement.remove();
+      resize.disconnect(); controls.dispose(); clearParts(); material.dispose();
+      lamp.children.forEach(line => (line as LineLoop).geometry.dispose()); lines.dispose();
+      keepouts.children.forEach(line => (line as LineSegments).geometry.dispose()); keepoutMaterial.dispose();
+      floor.geometry.dispose(); floor.material.dispose(); renderer.dispose(); renderer.domElement.remove();
     },
   };
 }

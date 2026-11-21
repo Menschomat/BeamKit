@@ -1,302 +1,228 @@
 <script lang="ts">
-  import { registerSW } from 'virtual:pwa-register';
-  import { loadProject, saveProject, projectNames } from './storage/projects.ts';
   import { onMount } from 'svelte';
-  import { p96l } from './catalog/p96l.ts';
-  import { defaultGrid, gridFields, validateGrid } from './geometry/profile.ts';
-  import type { GridMesh, GridRequest, GridResponse } from './geometry/protocol.ts';
+  import workerUrl from './geometry/grid.worker.ts?worker&url';
+  import { isOfflineReady } from './pwa/readiness.ts';
+  import { registerSW } from 'virtual:pwa-register';
+  import ParameterField from './app/ParameterField.svelte';
+  import { attachments, historicalMounts, connections, lamps, mounts, resolveDefinition } from './catalog/registry.ts';
+  import { attachmentDefinition, createDesign, decodeDesign, encodeDesign, printDiagnostics, upgradeLegacy, upgradePrintDesign, validateDesign } from './domain/project.ts';
+  import type { Design } from './domain/project.ts';
+  import { orientFrontDown } from './geometry/printability.ts';
+  import { exportBundle } from './export-bundle.ts';
   import { binaryStl, download } from './export.ts';
-  import { decodeProject, encodeProject, licenseUrl } from './project.ts';
-  import { createViewport } from './viewport.ts';
+  import { licenseUrl } from './project.ts';
+  import type { AssemblyResult } from './generators/assembly.ts';
+  import { GeometryController } from './geometry/controller.ts';
+  import { autosaveHistory, deleteProject, loadProject, projectNames, saveProject } from './storage/projects.ts';
+  import type { createViewport } from './viewport.ts';
+  import type { ViewOptions } from './viewport.ts';
 
-  let saving = $state(false);
-  let saveRevision = 0;
-  let offlineReady = $state(false);
-  let updateReady = $state(false);
+  let project = $state<Design>(createDesign());
+  let result = $state.raw<AssemblyResult | null>(null);
+  let current = $state(false), booting = $state(true), saving = $state(false), saved = $state(false);
+  let status = $state('Preparing workspace…'), error = $state(''), storageError = $state(''), previewError = $state('');
+  let offlineReady = $state(false), updateReady = $state(false);
+  let importCandidate = $state<Design | null>(null);
+  let names = $state<string[]>([]), localName = $state('P96L honeycomb');
+  let historyItems = $state<{ key: string; project: Design }[]>([]);
+  let undoStack = $state<string[]>([]), redoStack = $state<string[]>([]);
+  let settingsTab = $state<'attachment' | 'mount' | 'print'>('attachment');
+  let view = $state<ViewOptions>({ mode: 'assembly', lampVisible: true, keepoutsVisible: false, lampOpacity: 0.35 });
+  let showDimensions = $state(true), installOpen = $state(false), mobilePanel = $state<'model' | 'settings' | null>(null);
+  let host: HTMLDivElement, fileInput: HTMLInputElement;
+  let importDialog = $state<HTMLDialogElement>();
+  let viewport: ReturnType<typeof createViewport> | undefined, controller: GeometryController | undefined;
   let applyUpdate: ((reload?: boolean) => Promise<void>) | undefined;
-  let storageError = $state('');
-  let booting = $state(true);
-  let savedNames = $state<string[]>([]);
-  let projectName = $state('My P96L grid');
-  let undoStack = $state<string[]>([]);
-  let redoStack = $state<string[]>([]);
+  let revision = 0, saveRevision = 0, disposed = false;
   let saveTimer: ReturnType<typeof setTimeout>;
-  let settings = $state({ ...defaultGrid });
-  let mesh = $state.raw<GridMesh | null>(null);
-  let current = $state(false);
-  let status = $state('Generating grid…');
-  let importError = $state('');
-  let previewError = $state('');
-  let mode = $state<'assembly' | 'exploded' | 'grid'>('exploded');
-  let host: HTMLDivElement;
-  let fileInput: HTMLInputElement;
-  let viewport: ReturnType<typeof createViewport> | undefined;
-  let worker: Worker | undefined;
-  let requestId = 0;
-  let timer: ReturnType<typeof setTimeout>;
-  let pending: GridRequest | undefined;
-  let active: number | undefined;
+  const selectedLamp = $derived(resolveDefinition(lamps, project.lamp));
+  const selectedMount = $derived(project.mount ? resolveDefinition([...mounts, ...historicalMounts], project.mount) : null);
+  const definition = $derived(attachmentDefinition(project));
+  const diagnostics = $derived(result && current ? result.diagnostics : printDiagnostics(project));
+  const dimensions = $derived(result?.parts[0] ? result.parts[0].bounds.max.map((v, i) => v - result!.parts[0].bounds.min[i]) : null);
+  const triangleCount = $derived(result?.parts.reduce((sum, part) => sum + part.mesh.indices.length / 3, 0) ?? 0);
 
-  function dispatchLatest() {
-    if (!worker || !pending || active !== undefined) return;
-    active = pending.id;
-    worker.postMessage(pending);
-    pending = undefined;
+  function scheduleSave(snapshot: Design) {
+    clearTimeout(saveTimer); saving = true; saved = false;
+    const id = ++saveRevision;
+    saveTimer = setTimeout(() => {
+      void saveProject('_autosave', snapshot).then(() => {
+        if (id === saveRevision && !disposed) { saving = false; saved = true; storageError = ''; }
+      }).catch(() => { if (!disposed) { saving = false; storageError = 'Autosave failed. Save JSON to keep a portable backup.'; } });
+    }, 300);
   }
-
   function rebuild() {
-    const id = ++requestId;
-    clearTimeout(timer);
-    pending = undefined;
-    current = false;
+    ++revision; current = false; error = ''; status = 'Generating print geometry…';
+    clearTimeout(saveTimer); ++saveRevision; saving = false; saved = false;
     try {
-      validateGrid(settings);
-    } catch (error) {
-      status = (error as Error).message;
-      return;
-    }
-    if (!worker) {
-      status = 'Geometry worker unavailable.';
-      return;
-    }
-    if (!booting) {
-      const snapshot = { ...settings };
-      const revision = ++saveRevision;
-      saving = true;
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => {
-        saveProject('_autosave', snapshot).then(() => {
-          if (revision === saveRevision) saving = false;
-        }).catch(() => { storageError = 'Autosave failed. Save JSON to back up your design.'; });
-      }, 300);
-    }
-    status = 'Generating grid…';
-    timer = setTimeout(() => {
-      pending = { id, aperture: p96l.aperture, settings: { ...settings } };
-      dispatchLatest();
-    }, 120);
+      const snapshot = validateDesign($state.snapshot(project));
+      controller?.request(snapshot, revision);
+      if (!booting) scheduleSave(snapshot);
+    } catch (cause) { controller?.invalidate(); error = (cause as Error).message; status = 'Check the marked settings'; }
   }
-
-  function startWorker() {
-    worker = new Worker(new URL('./geometry/grid.worker.ts', import.meta.url), { type: 'module' });
-    worker.onmessage = ({ data }: MessageEvent<GridResponse>) => {
-      if (data.id !== active) return;
-      active = undefined;
-      dispatchLatest();
-      if (data.id !== requestId) return;
-      if ('error' in data) {
-        status = data.error;
-        return;
-      }
-      mesh = data;
-      current = true;
-      status = 'Grid ready';
-    };
-    worker.onerror = () => {
-      current = false;
-      status = 'The geometry worker failed. Retry generation to continue.';
-      worker?.terminate();
-      worker = undefined;
-      active = undefined;
-    };
+  function remember() { undoStack = [...undoStack.slice(-79), JSON.stringify(project)]; redoStack = []; }
+  function replace(next: Design) { remember(); project = structuredClone(next); localName = project.name; rebuild(); }
+  function changeParameter(group: 'mount' | 'attachment', key: string, value: number) {
+    remember(); const selection = project[group]; if (selection) selection.parameters[key] = value; rebuild();
   }
-
-  function retryGeneration() {
-    worker?.terminate();
-    active = undefined;
-    pending = undefined;
-    startWorker();
+  function changeAttachment(id: string) {
+    const entry = attachments.find(a => a.id === id)!; remember();
+    project.attachment = { id, revision: entry.revision, parameters: { ...entry.defaults } };
+    if (!project.mount && selectedLamp.mounts.length) {
+      const mount = mounts.find(entry => selectedLamp.mounts.includes(entry.id))!;
+      project.mount = { id: mount.id, revision: mount.revision, parameters: { ...mount.defaults } };
+    }
+    project.name = `${selectedLamp.label} ${entry.label.toLowerCase()}`; rebuild();
+  }
+  function changeMode(mode: Design['assembly']['mode']) {
+    remember(); project.assembly.mode = mode;
+    if (mode !== 'standalone' && !project.mount) project.mount = createDesign().mount;
     rebuild();
   }
-
-  onMount(() => {
-    applyUpdate = registerSW({
-      onOfflineReady() { offlineReady = true; },
-      onNeedRefresh() { updateReady = true; },
-      onRegisterError() { storageError = 'Offline preparation failed. Keep this tab online and try again later.'; },
-    });
-    try {
-      viewport = createViewport(host);
-    } catch {
-      previewError = '3D preview needs WebGL. Grid generation and export still work.';
-    }
-    startWorker();
-    void loadProject('_autosave').then(saved => {
-      if (saved) settings = saved;
-      return projectNames();
-    }).then(names => { savedNames = names; }).catch(() => {
-      storageError = 'Local storage is unavailable. Use JSON files to keep your design.';
-    }).finally(() => { booting = false; rebuild(); });
-    viewport?.update(mesh, mode);
-    return () => {
-      clearTimeout(timer);
-      clearTimeout(saveTimer);
-      worker?.terminate();
-      viewport?.dispose();
-    };
-  });
-
-  $effect(() => {
-    const activeMesh = mesh;
-    const activeMode = mode;
-    viewport?.update(activeMesh, activeMode);
-  });
-
-  async function importProject() {
-    const file = fileInput.files?.[0];
-    fileInput.value = '';
-    if (!file) return;
-    importError = '';
-    try {
-      if (file.size > 64 * 1024) throw new Error('The project file is too large.');
-      replaceSettings(decodeProject(await file.text()));
-    } catch (error) {
-      importError = (error as Error).message;
-    }
-  }
-
-  function setField(key: keyof typeof settings, value: number) {
-    undoStack = [...undoStack.slice(-99), JSON.stringify(settings)];
-    redoStack = [];
-    settings[key] = value;
-    rebuild();
-  }
-
-  function replaceSettings(next: typeof settings) {
-    undoStack = [...undoStack.slice(-99), JSON.stringify(settings)];
-    redoStack = [];
-    settings = { ...next };
-    rebuild();
-  }
-
   function history(direction: 'undo' | 'redo') {
-    const source = direction === 'undo' ? undoStack : redoStack;
-    const snapshot = source.at(-1);
-    if (!snapshot) return;
-    if (direction === 'undo') {
-      redoStack = [...redoStack, JSON.stringify(settings)]; undoStack = source.slice(0, -1);
-    } else {
-      undoStack = [...undoStack, JSON.stringify(settings)]; redoStack = source.slice(0, -1);
-    }
-    settings = JSON.parse(snapshot);
+    const stack = direction === 'undo' ? undoStack : redoStack, snapshot = stack.at(-1); if (!snapshot) return;
+    if (direction === 'undo') { redoStack = [...redoStack, JSON.stringify(project)]; undoStack = stack.slice(0, -1); }
+    else { undoStack = [...undoStack, JSON.stringify(project)]; redoStack = stack.slice(0, -1); }
+    project = JSON.parse(snapshot); rebuild();
+  }
+  function resetPreset() {
+    const next = structuredClone($state.snapshot(project));
+    next.attachment.parameters = { ...definition.defaults };
+    if (next.mount && selectedMount) next.mount.parameters = { ...selectedMount.defaults };
+    replace(validateDesign(next));
+  }
+  function changeLamp(id: string) {
+    const lamp = lamps.find(entry => entry.id === id)!;
+    const mount = mounts.find(entry => lamp.mounts.includes(entry.id));
+    if (!mount) { error = 'No supported mount is registered for this lamp.'; return; }
+    remember(); project.lamp = { id: lamp.id, revision: lamp.revision };
+    project.mount = { id: mount.id, revision: mount.revision, parameters: { ...mount.defaults } };
     rebuild();
   }
-
+  async function importProject() {
+    const file = fileInput.files?.[0]; fileInput.value = ''; if (!file) return;
+    try { if (file.size > 65536) throw new Error('Project exceeds the 64 KiB limit.'); importCandidate = decodeDesign(await file.text()); error = ''; }
+    catch (cause) { error = (cause as Error).message; }
+  }
+  function confirmImport() { if (importCandidate) { replace($state.snapshot(importCandidate)); importCandidate = null; } }
+  function saveJson() {
+    try { download('p96l-accessory.json', new Blob([encodeDesign($state.snapshot(project))], { type: 'application/json' })); }
+    catch (cause) { error = (cause as Error).message; }
+  }
+  function exportParts() {
+    if (!current || !result || result.projectRevision !== revision) return;
+    for (const part of result.parts) download(`${part.name}.stl`, new Blob([binaryStl(project.export.orientation === 'front-down' ? orientFrontDown(part.mesh) : part.mesh)], { type: 'model/stl' }));
+  }
+  function saveBundle() {
+    if (!current || !result || result.projectRevision !== revision) return;
+    download('p96l-accessory.zip', new Blob([exportBundle($state.snapshot(project), result)], { type: 'application/zip' }));
+  }
   async function saveNamed() {
-    if (!projectName.trim() || projectName.trim() === '_autosave') return;
     try {
-      await saveProject(projectName.trim(), { ...settings });
-      savedNames = await projectNames();
-      storageError = '';
-    } catch { storageError = 'Project could not be saved. Save JSON to back up your design.'; }
+      const name = localName.trim(); if (!name || name.startsWith('_') || name.length > 100) throw new Error('Use a project name of 1–100 characters, without a leading underscore.');
+      const snapshot = validateDesign({ ...$state.snapshot(project), name });
+      await saveProject(name, snapshot); names = await projectNames(); storageError = '';
+    } catch (cause) { storageError = (cause as Error).message; }
   }
-
   async function openNamed(name: string) {
-    try {
-      const saved = await loadProject(name);
-      if (saved) { replaceSettings(saved); projectName = name; }
-    } catch { storageError = 'The saved project could not be opened.'; }
+    try { const next = await loadProject(name); if (next) replace(next); }
+    catch { storageError = 'Could not open this local project. The current design is unchanged.'; }
   }
-
+  async function removeNamed(name: string) {
+    try { await deleteProject(name); names = await projectNames(); } catch { storageError = 'Could not delete the local project.'; }
+  }
+  async function showHistory() {
+    try { historyItems = await autosaveHistory(); } catch { storageError = 'Could not read autosave history.'; }
+  }
   async function updateApp() {
     if (!current || booting) return;
-    try {
-      await saveProject('_autosave', { ...settings });
-      await applyUpdate?.(true);
-    } catch { storageError = 'Could not save before updating. Save JSON before reloading.'; }
+    try { clearTimeout(saveTimer); await saveProject('_autosave', $state.snapshot(project)); await applyUpdate?.(true); }
+    catch { storageError = 'Save JSON before reloading: local save failed.'; }
   }
-
-  function exportGrid() {
-    if (!mesh || !current) return;
-    download('p96l-honeycomb.stl', new Blob([binaryStl(mesh)], { type: 'model/stl' }));
-  }
-
-  function saveJson() {
-    try {
-      download('p96l-honeycomb.json', new Blob([encodeProject(settings)], { type: 'application/json' }));
-      importError = '';
-    } catch (error) {
-      importError = (error as Error).message;
+  function keydown(event: KeyboardEvent) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !(event.target instanceof HTMLInputElement)) {
+      event.preventDefault(); history(event.shiftKey ? 'redo' : 'undo');
     }
   }
+  onMount(() => {
+    disposed = false;
+    const refreshReadiness = () => { void isOfflineReady(new URL(workerUrl, document.baseURI).href).then(ready => { if (!disposed) offlineReady = ready; }); };
+    navigator.serviceWorker?.addEventListener('controllerchange', refreshReadiness);
+    if ('serviceWorker' in navigator) void navigator.serviceWorker.ready.then(refreshReadiness);
+    applyUpdate = registerSW({ onOfflineReady() { refreshReadiness(); }, onNeedRefresh() { updateReady = true; }, onRegisterError() { storageError = 'Offline preparation failed. JSON backup and online editing remain available.'; } });
+    void import('./viewport.ts').then(({ createViewport }) => {
+      if (disposed) return;
+      try { viewport = createViewport(host); viewport.update(result, { ...view }); }
+      catch { previewError = 'WebGL preview is unavailable. Geometry and STL export still work.'; }
+    }).catch(() => { previewError = 'The preview could not load. Geometry and STL export still work.'; });
+    controller = new GeometryController(() => new Worker(workerUrl, { type: 'module' }), generated => {
+      if (generated.projectRevision !== revision || disposed) return;
+      result = generated; current = true; status = 'Print geometry ready';
+    }, message => { current = false; error = message; status = 'Generation stopped'; });
+    void loadProject('_autosave').then(next => { if (next && !disposed) { project = next; localName = next.name; } return projectNames(); })
+      .then(list => { if (!disposed) names = list; }).catch(() => { storageError = 'Local storage is unavailable. Use JSON files to keep your work.'; })
+      .finally(() => { if (!disposed) { booting = false; rebuild(); } });
+    return () => { disposed = true; navigator.serviceWorker?.removeEventListener('controllerchange', refreshReadiness); clearTimeout(saveTimer); controller?.dispose(); viewport?.dispose(); };
+  });
+  $effect(() => { const activeResult = result; const options = { ...view }; viewport?.update(activeResult, options); });
+  $effect(() => { if (importCandidate && importDialog && !importDialog.open) importDialog.showModal(); });
 </script>
 
-<header class="flex flex-wrap items-center justify-between gap-4 border-b border-line px-5 py-4">
-  <div class="flex items-baseline gap-3">
-    <h1 class="text-2xl font-bold tracking-tight">BeamKit</h1>
-    <span class="text-sm text-muted">Lamp attachment designer</span>
-  </div>
-  <div class="flex flex-wrap gap-2">
-    <input aria-label="Select project JSON" type="file" accept=".json,application/json" bind:this={fileInput} onchange={importProject} hidden />
-    <button disabled={booting} onclick={() => fileInput.click()}>Import JSON</button>
-    <button disabled={booting} onclick={saveJson}>Save JSON</button>
-    <button class="primary" disabled={!current} onclick={exportGrid}>Export STL</button>
-  </div>
-</header>
-
-{#if storageError}<p role="alert" class="px-5 py-2">{storageError}</p>{/if}
-{#if importError}<p class="border-b border-line px-5 py-2" role="alert">{importError}</p>{/if}
-
-<main class="workspace grid gap-3 p-3">
-  <aside class="panel space-y-6">
-    <section>
-      <h2>Local projects</h2>
-      <label for="project-name">Project name</label>
-      <input id="project-name" bind:value={projectName} />
-      <button disabled={booting} onclick={saveNamed}>Save locally</button>
-      {#each savedNames as name}<button onclick={() => openNamed(name)}>{name}</button>{/each}
-      <p class="text-sm text-muted">Stored in this browser. JSON is your portable backup.</p>
-    </section>
-    <section>
-      <h2>Lamp</h2>
-      <p class="mt-2 font-semibold">{p96l.label}</p>
-      <p class="text-sm text-muted">110 × 60 × 11.5 mm</p>
-    </section>
-    <section>
-      <h2>Attachment</h2>
-      <p class="mt-2 font-semibold">Honeycomb</p>
-      <p class="text-sm text-muted">Grid prototype. Mount geometry is pending.</p>
-    </section>
-  </aside>
-
-  <section class="panel viewport-panel" aria-label="Grid preview">
-    <div class="flex flex-wrap items-center gap-2">
-      {#each [['assembly', 'Assembled'], ['exploded', 'Exploded'], ['grid', 'Grid only']] as [value, label]}
-        <button aria-pressed={mode === value} class:primary={mode === value}
-          onclick={() => { mode = value as typeof mode; }}>{label}</button>
-      {/each}
-      <button disabled={booting} onclick={retryGeneration}>Retry generation</button>
-      <button class="ml-auto" onclick={() => viewport?.fit()}>Fit view</button>
+<svelte:window onkeydown={keydown} />
+<a class="skip-link" href="#workspace">Skip to workspace</a>
+<div class="app-shell">
+  <header class="app-header">
+    <a class="brand" href="/" aria-label="BeamKit workspace"><span class="brand-mark" aria-hidden="true">B<span>↗</span></span><strong>BeamKit</strong></a>
+    <div class="header-context"><span class="separator">/</span><h1>Lamp attachment designer</h1></div>
+    <div class="header-right"><span class="local-badge"><i></i> Local workspace</span><button class="quiet" onclick={() => installOpen = !installOpen}>Install app</button></div>
+  </header>
+  <div class="command-bar">
+    <div class="command-left"><span class="document-icon" aria-hidden="true">▱</span><span>{project.name}</span><span class="save-state">{booting ? 'Opening…' : saving ? 'Saving…' : saved ? 'Saved locally' : 'Unsaved changes'}</span></div>
+    <div class="command-actions">
+      <div class="history-actions"><button class="icon-button" title="Undo" aria-label="Undo" disabled={booting || !undoStack.length} onclick={() => history('undo')}>↶</button><button class="icon-button" title="Redo" aria-label="Redo" disabled={booting || !redoStack.length} onclick={() => history('redo')}>↷</button></div>
+      <input aria-label="Select project JSON" type="file" accept=".json,application/json" bind:this={fileInput} onchange={importProject} hidden />
+      <button class="quiet" disabled={booting} onclick={() => fileInput.click()}>Import JSON</button><button class="quiet" disabled={booting} onclick={saveJson}>Save JSON</button>
+      <button class="quiet bundle-action" disabled={!current} onclick={saveBundle}>Save bundle</button>
+      <button class="primary" disabled={!current} onclick={exportParts}><span aria-hidden="true">↓</span> Export STL</button>
     </div>
-    <div class="viewport" bind:this={host}></div>
-    {#if previewError}<p role="status">{previewError}</p>{/if}
-    {#if mode !== 'grid'}<p class="text-sm text-muted">Lamp reference · procedural wireframe</p>{/if}
-  </section>
-
-  <aside class="panel">
-    <h2>Honeycomb settings</h2>
-    <div class="flex flex-wrap gap-2 mt-3">
-      <button disabled={booting || !undoStack.length} onclick={() => history('undo')}>Undo</button>
-      <button disabled={booting || !redoStack.length} onclick={() => history('redo')}>Redo</button>
-      <button disabled={booting} onclick={() => replaceSettings(defaultGrid)}>Reset preset</button>
-    </div>
-    {#each gridFields as field (field.key)}
-      <label class="mt-5 block text-sm font-semibold" for={field.key}>{field.label}</label>
-      <div class="mt-2 flex items-center gap-2">
-        <input disabled={booting} aria-label={field.label + ' slider'} type="range" min={field.min} max={field.max}
-          step={field.step} value={settings[field.key]}
-          oninput={(event) => setField(field.key, event.currentTarget.valueAsNumber)} />
-        <input disabled={booting} id={field.key} type="number" min={field.min} max={field.max}
-          step={field.step} value={settings[field.key]}
-          oninput={(event) => setField(field.key, event.currentTarget.valueAsNumber)} />
-        <span class="text-xs text-muted">mm</span>
+  </div>
+  {#if installOpen}<div class="notice install-guide"><strong>Install BeamKit</strong><p>In Chrome, use the install icon in the address bar. On Safari, use Share → Add to Dock or Add to Home Screen. Open once online and wait for “Offline ready”. Browser storage can be cleared; keep JSON backups.</p><button onclick={() => installOpen = false}>Close guidance</button></div>{/if}
+  {#if updateReady}<div class="notice"><span>A new version is ready. Your design will be saved before reloading.</span><button disabled={!current} onclick={updateApp}>Save and reload update</button></div>{/if}
+  {#if storageError}<p class="notice error-notice" role="alert">{storageError}</p>{/if}
+  {#if error}<div class="notice error-notice" role="alert"><span>{error}</span><button onclick={rebuild}>Retry generation</button></div>{/if}
+  <div class="mobile-tools"><button aria-expanded={mobilePanel === 'model'} onclick={() => mobilePanel = mobilePanel === 'model' ? null : 'model'}>Model & projects</button><button aria-expanded={mobilePanel === 'settings'} onclick={() => mobilePanel = mobilePanel === 'settings' ? null : 'settings'}>Parameters</button></div>
+  <main id="workspace" class="workspace">
+    <aside class:mobile-open={mobilePanel === 'model'} class="model-panel sidebar">
+      <div class="panel-label"><span>Design setup</span><span class="step-count">01 / 03</span></div>
+      <section class="setup-section"><label class="section-heading" for="lamp">Lamp</label><select id="lamp" disabled={booting} value={project.lamp.id} onchange={event => changeLamp(event.currentTarget.value)}>{#each lamps as lamp}<option value={lamp.id}>{lamp.label}</option>{/each}</select><p class="spec-line">{selectedLamp.body.width} × {selectedLamp.body.height} × {selectedLamp.body.depth} mm <span class="tiny-badge">Reference</span></p></section>
+      <section class="setup-section"><h2 class="section-heading">One printable model</h2><p class="field-help">The mount and light-control structure form a single accessory. STL export places its front face on the bed.</p><details class="advanced-output"><summary>Advanced test tools</summary><label class="section-heading" for="output-mode">Output</label><select id="output-mode" disabled={booting || project.attachment.revision === 1 && project.attachment.id === 'honeycomb'} value={project.assembly.mode} onchange={event => changeMode(event.currentTarget.value as Design['assembly']['mode'])}><option value="integrated">Single integrated model</option><option value="fit-test">Fit coupon only</option><option value="standalone">Attachment only</option></select><p class="field-help">The fit coupon tests lamp contact and control access before the full print.</p></details></section>
+      <section class="setup-section"><h2 class="section-heading">Attachment</h2><div class="attachment-list">{#each attachments as attachment}<button disabled={booting} class="attachment-option" class:selected={project.attachment.id === attachment.id && project.attachment.revision === attachment.revision} aria-pressed={project.attachment.id === attachment.id && project.attachment.revision === attachment.revision} onclick={() => changeAttachment(attachment.id)}><span class="attachment-glyph" aria-hidden="true">{attachment.id === 'honeycomb' ? '⬡' : '▣'}</span><span><strong>{attachment.label}</strong><small>{attachment.id === 'honeycomb' ? 'Spill control' : 'Commercial diffusion material'}</small></span><span class="radio-dot" aria-hidden="true"></span></button>{/each}</div></section>
+      <section class="setup-section mount-summary"><h2 class="section-heading">Lamp access</h2><p class="field-help">USB, switch, button and dial access volumes are excluded from the collar.</p><details><summary>Modular connection</summary><p class="field-help">{connections[0].reason}</p></details></section>
+      <details class="projects-section" open><summary>Local projects <span>{names.length}</span></summary><label for="project-name" class="project-name-label">Project name</label><input id="project-name" bind:value={localName} maxlength="100" /><button class="full-width" disabled={booting} onclick={saveNamed}>Save locally</button>{#each names as name}<div class="saved-project"><button class="quiet" onclick={() => openNamed(name)}>{name}</button><button class="quiet icon-button" aria-label={`Delete ${name}`} onclick={() => removeNamed(name)}>×</button></div>{/each}<button class="text-button" onclick={showHistory}>View autosave history</button>{#each historyItems.slice(0, 5) as item}<button class="history-item" onclick={() => { replace(item.project); historyItems = []; }}>{new Date(Number(item.key.split(':')[1])).toLocaleString()}</button>{/each}<p class="field-help">Stored in this browser. JSON is your portable backup.</p></details>
+    </aside>
+    <section class="stage" aria-label="Accessory preview">
+      <div class="stage-header"><div><span class="eyebrow">{selectedLamp.label} / {project.assembly.mode === 'fit-test' ? 'Collar' : definition.label}</span><h2>{project.assembly.mode === 'fit-test' ? 'Collar fit test' : `${definition.label} assembly`}</h2></div><span class="prototype-badge">Prototype</span></div>
+      <div class="viewport" bind:this={host}></div>
+      {#if !current && result}<span class="stale-badge">Previous geometry · updating</span>{/if}
+      {#if previewError}<p class="preview-error">{previewError}</p>{/if}
+      <div class="view-toolbar"><div class="segmented" aria-label="Preview view">{#each [['assembly','Assembled'],['part','Part only'],['section','Section'],['print','Print pose']] as [mode, label]}<button aria-pressed={view.mode === mode} class:active={view.mode === mode} onclick={() => view.mode = mode as ViewOptions['mode']}>{label}</button>{/each}</div><div class="camera-actions"><button class="quiet" onclick={() => viewport?.fit(true)}>Front view</button><button class="quiet" onclick={() => viewport?.fit()}>Fit view</button></div></div>
+      <div class="view-options"><label><input type="checkbox" bind:checked={view.lampVisible} /> Lamp reference</label><label><input type="checkbox" bind:checked={view.keepoutsVisible} /> Access volumes</label><label><input type="checkbox" bind:checked={showDimensions} /> Dimensions</label><label class="opacity-control">Opacity<input aria-label="Lamp reference opacity" type="range" min="0.1" max="0.8" step="0.05" bind:value={view.lampOpacity} /></label></div>
+      {#if showDimensions && dimensions}<div class="dimension-strip"><span><small>Width</small>{dimensions[0].toFixed(1)} <em>mm</em></span><span><small>Height</small>{dimensions[1].toFixed(1)} <em>mm</em></span><span><small>Depth</small>{dimensions[2].toFixed(1)} <em>mm</em></span><span class="mesh-stat"><small>Print mesh</small>{triangleCount.toLocaleString()} <em>triangles</em></span></div>{/if}
+      <div class="stage-footnote"><span>Orbit to inspect · scroll to zoom</span><span>mm · +Z light direction</span></div>
+    </section>
+    <aside class:mobile-open={mobilePanel === 'settings'} class="settings-panel sidebar">
+      <div class="panel-label"><span>Parameters</span><button class="text-button" disabled={booting} onclick={resetPreset}>Reset preset</button></div>
+      <div class="settings-tabs">{#each [['attachment','Attachment'],['mount','Fit'],['print','Print']] as [tab, label]}<button class:active={settingsTab === tab} aria-pressed={settingsTab === tab} onclick={() => settingsTab = tab as typeof settingsTab}>{label}</button>{/each}</div>
+      <div class="settings-body">
+        {#if settingsTab === 'attachment'}<div class="settings-intro"><h2>{definition.label}</h2><p>{definition.description}</p></div>{#each definition.fields as field}<ParameterField {field} value={project.attachment.parameters[field.key]} disabled={booting} prefix="attachment" onchange={value => changeParameter('attachment', field.key, value)} />{/each}
+        {:else if settingsTab === 'mount'}<div class="settings-intro"><h2>Lamp fit</h2><p>Clearance is specified per side. Access envelopes always take priority.</p></div>{#if project.mount}{#each selectedMount?.fields ?? [] as field}<ParameterField {field} value={project.mount.parameters[field.key]} disabled={booting} prefix="mount" onchange={value => changeParameter('mount', field.key, value)} />{/each}{:else}<p class="field-help">The original grid has no collar. Upgrade explicitly to add a mount.</p>{/if}
+        {:else}<div class="settings-intro"><h2>Print profile</h2><p>Designed around a Bambu Lab printer with a 0.4 mm nozzle. Slice the STL in your preferred slicer.</p></div><dl class="print-specs"><div><dt>Nozzle diameter</dt><dd>0.4 mm</dd></div><div><dt>Default grid walls</dt><dd>0.8 mm · 2 nominal paths</dd></div><div><dt>STL scale</dt><dd>Millimetres</dd></div><div><dt>Print orientation</dt><dd>Front face on bed</dd></div><div><dt>Starting setup</dt><dd>0.20 mm layers · 4 walls</dd></div><div><dt>Infill</dt><dd>0–10% · inspect in slicer</dd></div></dl><label for="material" class="section-heading">Planned material</label><select id="material" value={project.printProfile.material} onchange={event => { remember(); project.printProfile.material = event.currentTarget.value as Design['printProfile']['material']; rebuild(); }}><option value="unspecified">Choose in slicer</option><option>PLA</option><option>PETG</option><option>ASA</option></select><p class="field-help">Material choice does not certify temperature resistance. Confirm walls, orientation, supports and fit in the slicer.</p>{/if}
       </div>
-    {/each}
-  </aside>
-</main>
-
-<footer class="flex flex-wrap justify-between gap-2 border-t border-line px-5 py-3 text-sm">
-  <span role="status">{offlineReady ? 'Offline ready · ' : ''}{status} · {saving ? 'Saving…' : 'Saved locally'}{#if mesh && !current} · Previous preview shown{/if}</span>
-  {#if updateReady}<button disabled={!current || booting} onclick={updateApp}>Save and reload update</button>{/if}
-  <a class="underline" href={licenseUrl} target="_blank" rel="noreferrer">Generated geometry · CC0 1.0</a>
-</footer>
+      <details class="diagnostics" open><summary><span class="warning-dot"></span>Print notes <span>{diagnostics.length}</span></summary>{#each diagnostics as note}<p class:warning={note.level === 'warning'}>{note.message}</p>{/each}</details>
+    </aside>
+  </main>
+  {#if project.mount && project.mount.revision < 3}<div class="notice"><span>Earlier geometry preserved. A new revision adds two open-side spring tabs, print ramps and a lighter frame.</span><button onclick={() => replace(upgradePrintDesign(project))}>Use print-optimized design</button></div>{/if}
+  {#if project.attachment.id === 'honeycomb' && project.attachment.revision === 1}<div class="notice"><span>Original grid revision preserved. Adding a collar changes the geometry.</span><button onclick={() => replace(upgradeLegacy(project))}>Upgrade to collar design</button></div>{/if}
+  <footer class="status-bar"><span role="status"><i class:ready={current}></i>{status}{#if current && result}<span class="status-detail"> · {Math.round(result.elapsedMs)} ms · 1 connected part{#if result.printAnalysis && result.printAnalysis.steepOverhangAreaMm2 < 0.00001} · 45° check passed{/if}</span>{/if} · {saving ? 'Saving…' : saved ? 'Saved locally' : 'Not saved'}{#if offlineReady} · Offline ready{/if}</span><a href={licenseUrl} target="_blank" rel="noreferrer">Generated output · CC0 1.0 ↗</a></footer>
+</div>
+{#if importCandidate}<dialog class="import-dialog" bind:this={importDialog} aria-labelledby="import-title" oncancel={() => importCandidate = null}><span class="eyebrow">Project import</span><h2 id="import-title">Review this design</h2><dl><div><dt>Name</dt><dd>{importCandidate.name}</dd></div><div><dt>Lamp</dt><dd>{importCandidate.lamp.id} · rev {importCandidate.lamp.revision}</dd></div><div><dt>Attachment</dt><dd>{importCandidate.attachment.id} · rev {importCandidate.attachment.revision}</dd></div><div><dt>Output</dt><dd>{importCandidate.assembly.mode} · mm</dd></div></dl><p>Your current design stays intact until you import. You can undo the replacement.</p><div class="dialog-actions"><button onclick={() => importCandidate = null}>Cancel import</button><button class="primary" onclick={confirmImport}>Import design</button></div></dialog>{/if}

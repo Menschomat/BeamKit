@@ -1,0 +1,8 @@
+{
+  "format": "beamkit-grid-prototype",
+  "schemaVersion": 1,
+  "units": "mm",
+  "lamp": { "id": "smallrig.p96l", "revision": 1 },
+  "attachment": { "id": "honeycomb", "revision": 1, "parameters": { "opening": 6, "depth": 12, "wall": 0.8, "frame": 2 } },
+  "outputLicense": "CC0-1.0"
+}

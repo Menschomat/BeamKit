@@ -15,6 +15,10 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - run: npm run schema
+      - run: git diff --exit-code -- public/project.schema.json public/legacy-grid.schema.json
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - run: npm run check:assets
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:browser
+      - run: BEAMKIT_BROWSER=webkit npm run test:browser -- workflow.spec.ts

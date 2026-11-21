@@ -1,6 +1,9 @@
 # BeamKit
 
-A browser-based designer for printable lamp accessories. The initial prototype generates a P96L honeycomb grid and shows it against an original wireframe of the lamp. Grid dimensions are editable, settings can be imported and exported as JSON, and STL data uses millimetres.
+Design printable SmallRig P96L accessories in your browser. Choose a honeycomb
+or diffusion sheet holder, adjust the geometry, and export one integrated STL in
+millimetres. The front face is placed on the print bed for the current presets.
+An optional fit coupon is available under Advanced test tools.
 
 ## Development
 
@@ -20,6 +23,9 @@ Run `npx playwright install chromium` once, then `npm run build` and `npm run te
 
 See [the validation report](docs/VALIDATION.md) for milestone status and unverified checks.
 
-The static build goes to `dist/`. The plan describes the future mount, accessory connection and Cloudflare Pages deployment. The prototype grid is a geometry sample. It does not yet clip onto the lamp and has not been validated in a slicer or on hardware.
+The static build goes to `dist/`. The [print test guide](docs/PRINT_TESTS.md)
+records the starting dimensions and checks for the click-on prototype. Physical
+fit, retention, heat and optical behavior still need hardware testing.
+
 
 See [PROJECT_PLAN.md](PROJECT_PLAN.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [AGENTS.md](AGENTS.md) for project scope and workflow. Code is [MIT licensed](LICENSE). The project's rights in original generated accessories are dedicated under [CC0 1.0](MODEL_LICENSE.md).
