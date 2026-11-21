@@ -1,7 +1,8 @@
 import {
   AmbientLight, Box3, BoxGeometry, BufferAttribute, BufferGeometry, Color, DirectionalLight,
-  EdgesGeometry, GridHelper, Group, LineBasicMaterial, LineLoop, LineSegments, Mesh,
-  MeshStandardMaterial, PerspectiveCamera, Plane, Scene, Vector3, WebGLRenderer,
+  EdgesGeometry, ExtrudeGeometry, GridHelper, Group, LineBasicMaterial, LineLoop, LineSegments, Mesh,
+  MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, Plane, Scene, Shape, ShapeGeometry,
+  Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { lamps } from './catalog/registry.ts';
@@ -20,10 +21,33 @@ export function createViewport(host: HTMLElement) {
   const light = new DirectionalLight(0xffffff, 3.2); light.position.set(-40, -90, 180); scene.add(light);
   const rim = new DirectionalLight(0xffffff, 1.2); rim.position.set(60, 40, 30); scene.add(rim);
   const lamp = new Group();
-  const lines = new LineBasicMaterial({ color: '#6d747b', transparent: true, opacity: 0.35 });
-  const reference = lampReferenceLines(lamps[0]);
-  for (const loop of reference.loops) lamp.add(new LineLoop(new BufferGeometry().setFromPoints(loop.map(p => new Vector3(...p))), lines));
-  lamp.add(new LineSegments(new BufferGeometry().setFromPoints(reference.segments.map(p => new Vector3(...p))), lines));
+  const profile = lamps[0];
+  const reference = lampReferenceLines(profile);
+  const lines = new LineBasicMaterial({ color: '#535660', transparent: true, depthWrite: false });
+  const apertureLine = new LineBasicMaterial({ color: '#a94635', transparent: true, depthWrite: false });
+  const housingTint = new MeshBasicMaterial({ color: '#858791', transparent: true, depthWrite: false });
+  const apertureTint = new MeshBasicMaterial({ color: '#ff634a', transparent: true, depthWrite: false });
+
+  // Use the procedural reference contours for the translucent viewport surfaces.
+  const [front, , , aperture] = reference.loops;
+  const housing = new ExtrudeGeometry(new Shape(front.map(([x, y]) => new Vector2(x, y))), {
+    depth: profile.body.depth, bevelEnabled: false,
+  });
+  housing.translate(0, 0, -profile.body.depth);
+  const housingMesh = new Mesh(housing, housingTint);
+  lamp.add(housingMesh);
+  const apertureMesh = new Mesh(new ShapeGeometry(new Shape(aperture.map(([x, y]) => new Vector2(x, y)))), apertureTint);
+  apertureMesh.renderOrder = 1;
+  lamp.add(apertureMesh);
+  for (const loop of reference.loops) {
+    const outline = new LineLoop(new BufferGeometry().setFromPoints(loop.map(p => new Vector3(...p))),
+      loop === aperture ? apertureLine : lines);
+    outline.renderOrder = 2;
+    lamp.add(outline);
+  }
+  const uprights = new LineSegments(new BufferGeometry().setFromPoints(reference.segments.map(p => new Vector3(...p))), lines);
+  uprights.renderOrder = 2;
+  lamp.add(uprights);
   scene.add(lamp);
   const keepouts = new Group(); const keepoutMaterial = new LineBasicMaterial({ color: '#c04c39', transparent: true, opacity: 0.65 });
   for (const { bounds } of lamps[0].keepouts) {
@@ -69,7 +93,11 @@ export function createViewport(host: HTMLElement) {
   return {
     fit,
     update(result: AssemblyResult | null, options: ViewOptions) {
-      lamp.visible = options.lampVisible && options.mode === 'assembly'; lines.opacity = options.lampOpacity;
+      lamp.visible = options.lampVisible && options.mode === 'assembly';
+      lines.opacity = options.lampOpacity;
+      apertureLine.opacity = options.lampOpacity * 0.85;
+      housingTint.opacity = options.lampOpacity * 0.32;
+      apertureTint.opacity = options.lampOpacity * 0.2;
       keepouts.visible = options.keepoutsVisible && options.mode !== 'print';
       partGroup.rotation.x = options.mode === 'print' ? Math.PI : 0;
       partGroup.position.z = options.mode === 'print' ? Math.max(...(result?.parts.map(part => part.bounds.max[2]) ?? [0])) : 0;
@@ -93,7 +121,8 @@ export function createViewport(host: HTMLElement) {
     },
     dispose() {
       resize.disconnect(); controls.dispose(); clearParts(); material.dispose();
-      lamp.children.forEach(line => (line as LineLoop).geometry.dispose()); lines.dispose();
+      lamp.children.forEach(object => (object as Mesh | LineLoop | LineSegments).geometry.dispose());
+      for (const material of [lines, apertureLine, housingTint, apertureTint]) material.dispose();
       keepouts.children.forEach(line => (line as LineSegments).geometry.dispose()); keepoutMaterial.dispose();
       floor.geometry.dispose(); floor.material.dispose(); renderer.dispose(); renderer.domElement.remove();
     },

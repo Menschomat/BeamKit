@@ -27,7 +27,7 @@
   let historyItems = $state<{ key: string; project: Design }[]>([]);
   let undoStack = $state<string[]>([]), redoStack = $state<string[]>([]);
   let settingsTab = $state<'attachment' | 'mount' | 'print'>('attachment');
-  let view = $state<ViewOptions>({ mode: 'assembly', lampVisible: true, keepoutsVisible: false, lampOpacity: 0.35 });
+  let view = $state<ViewOptions>({ mode: 'assembly', lampVisible: true, keepoutsVisible: false, lampOpacity: 0.65 });
   let showDimensions = $state(true), installOpen = $state(false), mobilePanel = $state<'model' | 'settings' | null>(null);
   let host: HTMLDivElement, fileInput: HTMLInputElement;
   let importDialog = $state<HTMLDialogElement>();
