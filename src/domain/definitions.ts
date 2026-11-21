@@ -1,7 +1,7 @@
 import type { Aperture } from '../geometry/profile.ts';
 import type { LampReference } from '../geometry/lamp-reference.ts';
 
-export type Field = { key: string; label: string; min: number; max: number; step: number; unit: 'mm' | '°'; help?: string };
+export type Field = { key: string; label: string; min: number; max: number; step: number; unit: 'mm' | '°'; help?: string; choices?: readonly { value: number; label: string }[] };
 export type DefinitionRef = { id: string; revision: number };
 export type Bounds = { min: [number, number, number]; max: [number, number, number] };
 export type Diagnostic = { level: 'info' | 'warning'; code: string; message: string };

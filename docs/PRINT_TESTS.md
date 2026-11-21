@@ -41,3 +41,10 @@ No modular file is currently offered as a tested mechanical connection.
 Optical comparisons need controlled photos or lux measurements at a recorded
 distance. A honeycomb restricts spill; a holder retains commercial diffusion
 material. Neither geometry alone yields a calibrated beam angle or transmission.
+
+
+For a pattern comparison, use the same lamp brightness, distance, camera
+position, and manual exposure on a blank wall. Start with 12 mm depth and
+0.8 mm walls for honeycomb, rectangular eggcrate, and louvers. Photograph
+both orientations of the directional patterns. Check spill and brightness
+along both axes before choosing a preset for a shoot.

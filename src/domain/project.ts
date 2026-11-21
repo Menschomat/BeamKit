@@ -1,3 +1,4 @@
+import { isGridPattern } from '../catalog/grid-patterns.ts';
 import { z } from 'zod';
 import { attachments, historicalAttachments, historicalMounts, lamps, mounts, resolveDefinition } from '../catalog/registry.ts';
 import { decodeProject as decodeLegacy, encodeProject as encodeLegacy } from '../project.ts';
@@ -32,12 +33,16 @@ function validateParameters(fields: readonly Field[], parameters: Record<string,
   for (const key of Object.keys(parameters)) if (!expected.has(key)) throw new Error(`Unknown parameter ${key}.`);
   for (const field of fields) {
     const value = parameters[field.key];
+    if (field.choices && !field.choices.some(choice => choice.value === value)) {
+      throw new Error(`Choose a supported value for ${field.label.toLowerCase()}.`);
+    }
     if (!Number.isFinite(value) || value < field.min || value > field.max) throw new Error(`${field.label} must be between ${field.min} and ${field.max} ${field.unit}.`);
   }
 }
 export function supportsMulticolor(project: Design) {
   return project.assembly.mode === 'integrated' && project.mount !== null &&
-    project.attachment.id === 'honeycomb' && project.attachment.revision >= 3;
+    isGridPattern(project.attachment.id) &&
+    (project.attachment.id !== 'honeycomb' || project.attachment.revision >= 3);
 }
 
 export function validateDesign(input: unknown): Design {
@@ -56,7 +61,7 @@ export function validateDesign(input: unknown): Design {
   if (project.assembly.mode !== 'standalone' && !project.mount) throw new Error('An integrated accessory or fit test requires a mount.');
   if (project.attachment.revision === 1 && project.attachment.id === 'honeycomb' && project.assembly.mode !== 'standalone') throw new Error('Original grids support standalone output only. Upgrade explicitly to add a collar.');
   if (project.export.format === '3mf' && !supportsMulticolor(project)) {
-    throw new Error('Multicolor export requires an integrated honeycomb.');
+    throw new Error('Multicolor export requires an integrated light grid.');
   }
   return project;
 }

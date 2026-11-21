@@ -4,12 +4,13 @@
   import { isOfflineReady } from './pwa/readiness.ts';
   import { registerSW } from 'virtual:pwa-register';
   import ParameterField from './app/ParameterField.svelte';
+  import { gridPatternIds, isGridPattern } from './catalog/grid-patterns.ts';
   import { attachments, connections, lamps, mounts, resolveDefinition } from './catalog/registry.ts';
   import { attachmentDefinition, createDesign, decodeDesign, encodeDesign, printDiagnostics, supportsMulticolor, validateDesign } from './domain/project.ts';
   import type { Design } from './domain/project.ts';
   import { orientFrontDown } from './geometry/printability.ts';
   import { multicolor3mf } from './export-3mf.ts';
-  import { materialRegions } from './domain/materials.ts';
+  import { gridMaterialLabel, materialRegions } from './domain/materials.ts';
   import { exportBundle } from './export-bundle.ts';
   import { binaryStl, download } from './export.ts';
   import { licenseUrl } from './project.ts';
@@ -40,6 +41,8 @@
   const selectedLamp = $derived(resolveDefinition(lamps, project.lamp));
   const selectedMount = $derived(project.mount ? resolveDefinition(mounts, project.mount) : null);
   const definition = $derived(attachmentDefinition(project));
+  const gridSelected = $derived(isGridPattern(project.attachment.id));
+  const patternOptions = gridPatternIds.map(id => attachments.find(attachment => attachment.id === id)!);
   const multicolorAvailable = $derived(supportsMulticolor(project));
   const multicolor = $derived(project.export.format === '3mf');
   const diagnostics = $derived(result && current ? result.diagnostics : printDiagnostics(project));
@@ -69,9 +72,13 @@
   function changeParameter(group: 'mount' | 'attachment', key: string, value: number) {
     remember(); const selection = project[group]; if (selection) selection.parameters[key] = value; rebuild();
   }
-  function changeAttachment(id: string) {
+  function changeAttachment(id: string, keepGridDimensions = false) {
     const entry = attachments.find(a => a.id === id)!; remember();
-    project.attachment = { id, revision: entry.revision, parameters: { ...entry.defaults } };
+    const parameters = { ...entry.defaults };
+    if (keepGridDimensions) {
+      for (const key of ['depth', 'wall', 'frame', 'inset']) parameters[key] = project.attachment.parameters[key];
+    }
+    project.attachment = { id, revision: entry.revision, parameters };
     if (!project.mount && selectedLamp.mounts.length) {
       const mount = mounts.find(entry => selectedLamp.mounts.includes(entry.id))!;
       project.mount = { id: mount.id, revision: mount.revision, parameters: { ...mount.defaults } };
@@ -212,7 +219,7 @@
       <div class="panel-label"><span>Design setup</span><span class="step-count">01 / 03</span></div>
       <section class="setup-section"><label class="section-heading" for="lamp">Lamp</label><select id="lamp" disabled={booting} value={project.lamp.id} onchange={event => changeLamp(event.currentTarget.value)}>{#each lamps as lamp}<option value={lamp.id}>{lamp.label}</option>{/each}</select><p class="spec-line">{selectedLamp.body.width} × {selectedLamp.body.height} × {selectedLamp.body.depth} mm <span class="tiny-badge">Reference</span></p></section>
       <section class="setup-section"><h2 class="section-heading">One printable model</h2><p class="field-help">The mount and light-control structure form a single accessory. STL export places its front face on the bed.</p><details class="advanced-output"><summary>Advanced test tools</summary><label class="section-heading" for="output-mode">Output</label><select id="output-mode" disabled={booting} value={project.assembly.mode} onchange={event => changeMode(event.currentTarget.value as Design['assembly']['mode'])}><option value="integrated">Single integrated model</option><option value="fit-test">Fit coupon only</option><option value="standalone">Attachment only</option></select><p class="field-help">The fit coupon tests lamp contact and control access before the full print.</p></details></section>
-      <section class="setup-section"><h2 class="section-heading">Attachment</h2><div class="attachment-list">{#each attachments as attachment}<button disabled={booting} class="attachment-option" class:selected={project.attachment.id === attachment.id && project.attachment.revision === attachment.revision} aria-pressed={project.attachment.id === attachment.id && project.attachment.revision === attachment.revision} onclick={() => changeAttachment(attachment.id)}><span class="attachment-glyph" aria-hidden="true">{attachment.id === 'honeycomb' ? '⬡' : '▣'}</span><span><strong>{attachment.label}</strong><small>{attachment.id === 'honeycomb' ? 'Spill control' : 'Commercial diffusion material'}</small></span><span class="radio-dot" aria-hidden="true"></span></button>{/each}</div></section>
+      <section class="setup-section"><h2 class="section-heading">Attachment</h2><div class="attachment-list">{#each [gridSelected ? definition : patternOptions[0], attachments.find(entry => entry.id === 'diffusion-sheet-holder')!] as attachment}<button disabled={booting} class="attachment-option" class:selected={project.attachment.id === attachment.id && project.attachment.revision === attachment.revision} aria-pressed={project.attachment.id === attachment.id && project.attachment.revision === attachment.revision} onclick={() => changeAttachment(attachment.id)}><span class="attachment-glyph" aria-hidden="true">{isGridPattern(attachment.id) ? '⬡' : '▣'}</span><span><strong>{attachment.label}</strong><small>{isGridPattern(attachment.id) ? 'Spill control' : 'Commercial diffusion material'}</small></span><span class="radio-dot" aria-hidden="true"></span></button>{/each}</div></section>
       <section class="setup-section mount-summary"><h2 class="section-heading">Lamp access</h2><p class="field-help">USB, switch, button and dial access volumes are excluded from the collar.</p><details><summary>Modular connection</summary><p class="field-help">{connections[0].reason}</p></details></section>
       <details class="projects-section" open><summary>Local projects <span>{names.length}</span></summary><label for="project-name" class="project-name-label">Project name</label><input id="project-name" bind:value={localName} maxlength="100" /><button class="full-width" disabled={booting} onclick={saveNamed}>Save locally</button>{#each names as name}<div class="saved-project"><button class="quiet" onclick={() => openNamed(name)}>{name}</button><button class="quiet icon-button" aria-label={`Delete ${name}`} onclick={() => removeNamed(name)}>×</button></div>{/each}<button class="text-button" onclick={showHistory}>View autosave history</button>{#each historyItems.slice(0, 5) as item}<button class="history-item" onclick={() => { replace(item.project); historyItems = []; }}>{new Date(Number(item.key.split(':')[1])).toLocaleString()}</button>{/each}<p class="field-help">Stored in this browser. JSON is your portable backup.</p></details>
     </aside>
@@ -230,7 +237,20 @@
       <div class="panel-label"><span>Parameters</span><button class="text-button" disabled={booting} onclick={resetPreset}>Reset preset</button></div>
       <div class="settings-tabs">{#each [['attachment','Attachment'],['mount','Fit'],['print','Print']] as [tab, label]}<button class:active={settingsTab === tab} aria-pressed={settingsTab === tab} onclick={() => settingsTab = tab as typeof settingsTab}>{label}</button>{/each}</div>
       <div class="settings-body">
-        {#if settingsTab === 'attachment'}<div class="settings-intro"><h2>{definition.label}</h2><p>{definition.description}</p></div>{#each definition.fields as field}<ParameterField {field} value={project.attachment.parameters[field.key]} disabled={booting} prefix="attachment" onchange={value => changeParameter('attachment', field.key, value)} />{/each}
+        {#if settingsTab === 'attachment'}
+          <div class="settings-intro"><h2>{definition.label}</h2><p>{definition.description}</p></div>
+          {#if gridSelected}
+            <div class="parameter">
+              <label class="section-heading" for="grid-pattern">Pattern</label>
+              <select id="grid-pattern" disabled={booting} value={project.attachment.id}
+                onchange={event => changeAttachment(event.currentTarget.value, true)}>
+                {#each patternOptions as pattern}<option value={pattern.id}>{pattern.label}</option>{/each}
+              </select>
+            </div>
+          {/if}
+          {#each definition.fields as field (field.key)}
+            <ParameterField {field} value={project.attachment.parameters[field.key]} disabled={booting} prefix="attachment" onchange={value => changeParameter('attachment', field.key, value)} />
+          {/each}
         {:else if settingsTab === 'mount'}<div class="settings-intro"><h2>Lamp fit</h2><p>Clearance is specified per side. Access envelopes always take priority.</p></div>{#if project.mount}{#each selectedMount?.fields ?? [] as field}<ParameterField {field} value={project.mount.parameters[field.key]} disabled={booting} prefix="mount" onchange={value => changeParameter('mount', field.key, value)} />{/each}{:else}<p class="field-help">Choose an integrated output to edit the lamp fit.</p>{/if}
         {:else}<div class="settings-intro"><h2>Print profile</h2><p>Designed around a Bambu Lab printer with a 0.4 mm nozzle. Assign filaments and slice in your preferred slicer.</p></div>{#if multicolorAvailable}
           <div class="multicolor-settings">
@@ -238,7 +258,7 @@
             {#if multicolor}
               <ul class="material-key">
                 {#each Object.values(materialRegions) as region}
-                  <li><i style:background={region.color}></i>{region.label}</li>
+                  <li><i style:background={region.color}></i>{region === materialRegions.honeycomb ? gridMaterialLabel(project.attachment.id) : region.label}</li>
                 {/each}
               </ul>
               <p class="field-help">The 0.8 mm liner runs around the grid. Import the 3MF as one object with three parts, then assign filaments in your slicer.</p>

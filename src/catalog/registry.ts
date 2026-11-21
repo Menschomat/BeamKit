@@ -1,3 +1,4 @@
+import { extraGridPatterns } from './grid-patterns.ts';
 import { p96l } from './p96l.ts';
 import type { AttachmentDefinition, ConnectionDefinition, Field, LampDefinition, MountDefinition } from '../domain/definitions.ts';
 import { gridFields } from '../geometry/profile.ts';
@@ -33,6 +34,7 @@ export const attachments: readonly AttachmentDefinition[] = [
       { key: 'sheetThickness', label: 'Sheet thickness', min: 0.1, max: 1, step: 0.1, unit: 'mm' },
     ], defaults: { depth: 6.4, wall: 1.6, ledge: 2, sheetThickness: 0.3 }, supportedApertures: ['rounded-rectangle'],
   },
+  ...extraGridPatterns,
 ];
 export const lamps: readonly LampDefinition[] = [{ ...p96l,
   provenance: { source: 'Reference-model dimensions recorded in PROJECT_PLAN.md', confidence: 'reference-only',

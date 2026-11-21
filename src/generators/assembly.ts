@@ -2,9 +2,11 @@ import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import { lamps, resolveDefinition } from '../catalog/registry.ts';
 import { printDiagnostics, validateDesign } from '../domain/project.ts';
 import type { Design } from '../domain/project.ts';
-import { materialRegions } from '../domain/materials.ts';
+import { gridMaterialLabel, materialRegions } from '../domain/materials.ts';
 import type { Bounds, Diagnostic, LampDefinition } from '../domain/definitions.ts';
-import { hexagons, roundedOutline } from '../geometry/profile.ts';
+import { isGridPattern } from '../catalog/grid-patterns.ts';
+import { gridOpenings } from '../geometry/grid-openings.ts';
+import { roundedOutline } from '../geometry/profile.ts';
 import type { Aperture, GridSettings, Point } from '../geometry/profile.ts';
 import { analyzeOverhangs, orientFrontDown } from '../geometry/printability.ts';
 import type { OverhangReport } from '../geometry/printability.ts';
@@ -62,11 +64,13 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     const inset = p.inset ?? 0;
     const aperture = { width: lamp.aperture.width - inset * 2, height: lamp.aperture.height - inset * 2, radius: Math.max(0.5, lamp.aperture.radius - inset) };
     let attachment: Manifold;
-    if (project.attachment.id === 'honeycomb') {
-      const angle = p.orientation * Math.PI / 180;
-      const coverage = { width: Math.hypot(aperture.width, aperture.height), height: Math.hypot(aperture.width, aperture.height), radius: 0 };
-      const cells = hexagons(coverage, p as GridSettings).map(cell => cell.map(([x, y]): [number, number] => [x * Math.cos(angle) - y * Math.sin(angle), x * Math.sin(angle) + y * Math.cos(angle)]));
-      const holes = own(own(new CrossSection(cells)).intersect(section(aperture)));
+    const pattern = project.attachment.id;
+    if (isGridPattern(pattern)) {
+      const openings = own(new CrossSection(gridOpenings(pattern, aperture, p)));
+      const clipped = own(openings.intersect(section(aperture)));
+      // Remove clipped slivers below two nominal nozzle widths from new patterns.
+      const holes = pattern === 'honeycomb' ? clipped
+        : own(own(own(clipped.offset(-0.4, 'Miter')).offset(0.4, 'Miter')).intersect(clipped));
       attachment = extrude(own(section({ width: aperture.width + 2 * p.frame, height: aperture.height + 2 * p.frame, radius: aperture.radius + p.frame }).subtract(holes)), p.depth);
     } else {
       if (project.attachment.revision >= 2) {
@@ -220,7 +224,7 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
             max: [40, sign < 0 ? -aperture.height / 2 : cavity.height / 2, seatTop] })));
         }
         // A tapered shoulder grows outwards as the front-down print rises.
-        const frame = project.attachment.id === 'honeycomb' ? p.frame : p.wall;
+        const frame = isGridPattern(pattern) ? p.frame : p.wall;
         const topWidth = aperture.width + 2 * frame, topHeight = aperture.height + 2 * frame;
         const dx = Math.max(0, (outerShape.width - topWidth) / 2), dy = Math.max(0, (outerShape.height - topHeight) / 2);
         const rampHeight = Math.hypot(dx, dy) + 0.05;
@@ -241,7 +245,7 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     if (dfam) solid = own(own(new Manifold(solid.getMesh())).setTolerance(0.0001));
     const checked = validateSolid(solid, scope);
     const printAnalysis = analyzeOverhangs(orientFrontDown(checked.mesh));
-    if (dfam && project.attachment.id === 'honeycomb' && printAnalysis.steepOverhangAreaMm2 > 0.00001) throw new Error('This configuration exceeds the 45-degree front-down print limit. Adjust the frame, depth or fit settings.');
+    if (dfam && isGridPattern(pattern) && printAnalysis.steepOverhangAreaMm2 > 0.00001) throw new Error('This configuration exceeds the 45-degree front-down print limit. Adjust the frame, depth or fit settings.');
     let regions: MaterialRegion[] | undefined;
     if (project.export.format === '3mf' && project.mount) {
       const { diffuserClearanceMm, supportThicknessMm } = project.mount.parameters;
@@ -260,7 +264,7 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
       const liner = own(insideLiner.subtract(gridBoundary));
       const shell = own(partitionSource.subtract(linerBoundary));
       const region = (material: MaterialRegion['material'], geometry: Manifold): MaterialRegion => ({
-        material, name: materialRegions[material].label,
+        material, name: material === 'honeycomb' ? gridMaterialLabel(pattern) : materialRegions[material].label,
         ...validateSolid(own(own(new Manifold(geometry.getMesh())).setTolerance(0.0001)), scope, material),
         transform: [0, 0, 0],
       });

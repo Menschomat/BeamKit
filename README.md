@@ -5,8 +5,13 @@ or diffusion sheet holder, adjust the geometry, and export one integrated STL in
 millimetres. The front face is placed on the print bed for the current presets.
 An optional fit coupon is available under Advanced test tools.
 
-For an integrated honeycomb, open **Print → Multicolor printing** to preview
-and export one 3MF with three parts: a black honeycomb, a 0.8 mm gray inner
+Choose a **Pattern** in the grid attachment settings. Honeycomb is the default.
+Square and rectangular eggcrate share the same frame and mount. Turn the
+rectangular openings or louver slats by 90° to change which axis gets more
+spill control. The presets are starting dimensions, not measured beam angles.
+
+For an integrated light grid, open **Print → Multicolor printing** to preview
+and export one 3MF with three parts: a black grid or louvers, a 0.8 mm gray inner
 shell, and an orange outer shell with clips. Import it as a single multipart model
 and assign a filament to each part in the slicer. The preview colors identify
 the regions, while the slicer controls the real filaments and printer settings.

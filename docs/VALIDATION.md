@@ -22,6 +22,12 @@ uses millimetres and groups the regions under one build object. Bambu Studio
 113.8 × 63.8 × 28.5 mm and a minimum Z of 0. Filament assignment, actual sliced
 toolpaths and material compatibility remain hardware and slicer checks.
 
+The pattern selector adds square eggcrate (6 × 6 mm), rectangular eggcrate
+(4 × 10 mm), and parallel louvers (6 mm gaps). The rectangular and louver
+patterns have two orientations. These patterns keep the existing front-down
+mount, shell, and liner. Bambu Studio CLI read each default 3MF as three
+manifold parts at the same dimensions and bed position as the honeycomb.
+
 | Plan milestone | Evidence and remaining gate |
 | --- | --- |
 | Geometry feasibility | Manifold 3.5.5 generates closed, connected solids with clear access volumes. The benchmark records assembly, STL and alternative subtraction timings. Node RSS grew across 600 builds. The browser recycles its worker after 32 successful builds to bound the lifetime of each WASM heap. Long-session browser memory and Bambu Studio import remain to be checked. |

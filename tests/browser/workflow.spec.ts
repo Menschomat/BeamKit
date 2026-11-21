@@ -137,3 +137,39 @@ test('multicolor mode downloads a 3MF, survives reload, and can switch back to S
   await page.getByRole('checkbox', { name: 'Multicolor printing' }).uncheck();
   await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
 });
+
+test('pattern switch keeps common dimensions and exports the selected grid', async ({ page }) => {
+  await page.goto('/');
+  const stl = page.getByRole('button', { name: 'Export STL', exact: true });
+  await expect(stl).toBeEnabled();
+  const pattern = page.getByLabel('Pattern', { exact: true });
+  const depth = page.getByRole('spinbutton', { name: 'Depth', exact: true });
+  await depth.fill('15');
+  await pattern.selectOption('square-eggcrate');
+  await expect(page.getByRole('spinbutton', { name: 'Clear cell width', exact: true })).toHaveValue('6');
+  await pattern.selectOption('rectangular-eggcrate');
+  await expect(depth).toHaveValue('15');
+  await expect(page.getByRole('spinbutton', { name: 'Clear opening A' })).toHaveValue('4');
+  await expect(page.getByRole('spinbutton', { name: 'Clear opening B' })).toHaveValue('10');
+  await page.getByLabel('Cell orientation', { exact: true }).selectOption('90');
+  await expect(stl).toBeEnabled();
+  const stlDownload = page.waitForEvent('download');
+  await stl.click();
+  expect((await stlDownload).suggestedFilename()).toBe('p96l-rectangular-eggcrate.stl');
+
+  await pattern.selectOption('parallel-louvers');
+  await expect(page.getByRole('spinbutton', { name: 'Clear slat spacing' })).toHaveValue('6');
+  await page.getByLabel('Slat direction', { exact: true }).selectOption('90');
+  await page.getByRole('button', { name: 'Print', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Multicolor printing' }).check();
+  const threeMf = page.getByRole('button', { name: 'Export 3MF', exact: true });
+  await expect(threeMf).toBeEnabled();
+  const threeMfDownload = page.waitForEvent('download');
+  await threeMf.click();
+  expect((await threeMfDownload).suggestedFilename()).toBe('p96l-parallel-louvers-multicolor.3mf');
+  await expect(page.getByRole('status')).toContainText('Saved locally');
+  await page.reload();
+  await expect(pattern).toHaveValue('parallel-louvers');
+  await expect(page.getByLabel('Slat direction', { exact: true })).toHaveValue('90');
+  await expect(threeMf).toBeEnabled();
+});

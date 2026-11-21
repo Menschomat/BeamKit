@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Module from 'manifold-3d';
+import { extraGridPatterns } from '../src/catalog/grid-patterns.ts';
 import { createDesign, decodeDesign, encodeDesign } from '../src/domain/project.ts';
 import { multicolor3mf } from '../src/export-3mf.ts';
 import { generateAssembly } from '../src/generators/assembly.ts';
@@ -45,7 +46,7 @@ test('multicolor regions partition the integrated solid without bulk overlap', (
     } finally { scope.dispose(); }
   }
   project.assembly.mode = 'fit-test';
-  assert.throws(() => encodeDesign(project), /integrated honeycomb/);
+  assert.throws(() => encodeDesign(project), /integrated light grid/);
 });
 
 test('3MF encodes one build object with three named, bed-aligned components', () => {
@@ -64,4 +65,28 @@ test('3MF encodes one build object with three named, bed-aligned components', ()
   const heights = Array.from(model.matchAll(/<vertex x="[^"]+" y="[^"]+" z="([^"]+)"/g), match => Number(match[1]));
   assert.equal(Math.min(...heights), 0);
   assert.equal(Math.max(...heights), 28.5);
+});
+
+test('square, rectangular and louver presets share the mount and material boundaries', () => {
+  const project = createDesign();
+  project.export.format = '3mf';
+  const baseline = generateAssembly(kernel, project);
+  const baselineVolumes = baseline.regions!.slice(1).map(part => part.volumeMm3);
+  for (const attachment of extraGridPatterns) {
+    project.attachment = { id: attachment.id, revision: attachment.revision, parameters: { ...attachment.defaults } };
+    for (const orientation of attachment.defaults.orientation === undefined ? [undefined] : [0, 90]) {
+      if (orientation !== undefined) project.attachment.parameters.orientation = orientation;
+      const stored = decodeDesign(encodeDesign(project));
+      assert.deepEqual(stored.attachment, project.attachment);
+      const result = generateAssembly(kernel, stored);
+      assert.deepEqual(result.parts[0].bounds, baseline.parts[0].bounds);
+      assert.ok(result.printAnalysis!.steepOverhangAreaMm2 < 0.00001);
+      assert.notEqual(result.parts[0].volumeMm3, baseline.parts[0].volumeMm3);
+      assert.ok(Math.abs(result.regions!.reduce((sum, part) => sum + part.volumeMm3, 0) - result.parts[0].volumeMm3) < 0.01);
+      result.regions!.slice(1).forEach((part, i) => assert.ok(Math.abs(part.volumeMm3 - baselineVolumes[i]) < 0.01));
+      assert.ok(modelXml(multicolor3mf(result, 'front-down')).includes(attachment.id === 'parallel-louvers' ? 'name="Louvers"' : 'name="Eggcrate grid"'));
+    }
+  }
+  project.attachment.parameters.orientation = 45;
+  assert.throws(() => encodeDesign(project), /supported value for slat direction/);
 });

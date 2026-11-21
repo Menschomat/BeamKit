@@ -20,7 +20,7 @@ export function multicolor3mf(result: AssemblyResult, orientation: Design['expor
   }
   const { regions } = result;
   const frontZ = result.parts[0].bounds.max[2];
-  const definitions = regions.map(({ material }) => materialRegions[material]);
+  const definitions = regions.map(({ material, name }) => ({ label: name, color: materialRegions[material].color }));
   const baseMaterials = definitions.map(({ label, color }) =>
     `<base name="${escapeXml(label)}" displaycolor="${color}"/>`).join('');
   const objects = regions.map((region, index) => {
@@ -40,10 +40,10 @@ export function multicolor3mf(result: AssemblyResult, orientation: Design['expor
   }).join('');
   const components = regions.map((_, index) => `<component objectid="${index + 2}"/>`).join('');
   const model = `${xml}<model unit="millimeter" xml:lang="en-US" xmlns="${coreNamespace}">` +
-    `<metadata name="Title">BeamKit multicolor honeycomb</metadata>` +
+    `<metadata name="Title">BeamKit multicolor light grid</metadata>` +
     `<metadata name="LicenseTerms">${outputLicense} ${licenseUrl}</metadata>` +
     `<resources><basematerials id="1">${baseMaterials}</basematerials>${objects}` +
-    `<object id="5" type="model" name="BeamKit honeycomb"><components>${components}</components></object></resources>` +
+    `<object id="5" type="model" name="BeamKit light grid"><components>${components}</components></object></resources>` +
     `<build><item objectid="5"/></build></model>`;
 
   const types = `${xml}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +

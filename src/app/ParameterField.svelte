@@ -4,6 +4,14 @@
   let id = $derived(`${prefix}-${field.key}`);
   let invalid = $derived(!Number.isFinite(value) || value < field.min || value > field.max);
 </script>
+{#if field.choices}
+<div class="parameter">
+  <label class="section-heading" for={id}>{field.label}</label>
+  <select {id} {disabled} {value} onchange={event => onchange(Number(event.currentTarget.value))}>
+    {#each field.choices as choice}<option value={choice.value}>{choice.label}</option>{/each}
+  </select>
+</div>
+{:else}
 <div class="parameter">
   <div class="parameter-heading">
     <label id={`${id}-label`} for={id}>{field.label}</label>
@@ -16,3 +24,4 @@
   {#if invalid}<p class="field-error" id={`${id}-error`}>Use {field.min}–{field.max} {field.unit}.</p>
   {:else if field.help}<p class="field-help" id={`${id}-help`}>{field.help}</p>{/if}
 </div>
+{/if}
