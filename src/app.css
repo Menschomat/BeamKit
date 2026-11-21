@@ -1,0 +1,33 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-canvas: #f4f4f6;
+  --color-surface: #e7e7e7;
+  --color-line: #d2d2d4;
+  --color-accent: #ff634a;
+  --color-ink: #202124;
+  --color-muted: #53545b;
+}
+
+body { @apply m-0 bg-canvas text-ink antialiased; }
+button { @apply cursor-pointer rounded-md border border-line bg-surface px-3 py-2 text-sm font-semibold; }
+button:hover { @apply brightness-95; }
+button:focus-visible, input:focus-visible, a:focus-visible { @apply outline-2 outline-offset-2 outline-ink; }
+button:disabled { @apply cursor-not-allowed opacity-50; }
+button.primary { @apply border-accent bg-accent text-ink; }
+h2 { @apply text-base font-bold; }
+.panel { @apply rounded-xl border border-line p-3; }
+.workspace { grid-template-columns: 210px minmax(0, 1fr) 265px; }
+.viewport-panel { @apply flex min-w-0 flex-col gap-2; }
+.viewport { @apply min-h-[420px] flex-1 overflow-hidden rounded-lg bg-surface; }
+.viewport canvas { @apply block; }
+input[type='range'] { @apply min-w-0 flex-1 accent-accent; }
+input[type='number'] { @apply w-16 rounded border border-line bg-white px-1 py-1 text-sm; }
+@media (max-width: 850px) {
+  .workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .viewport-panel { grid-column: 1 / -1; grid-row: 1; }
+}
+@media (max-width: 520px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .viewport { @apply min-h-[295px]; }
+}
