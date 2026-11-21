@@ -47,9 +47,9 @@ Inspect STL scale and slicer wall paths, then print-test the relevant lamp.
 ## Revisions and exports
 
 The project schema, generator, kernel and definition revisions are separate.
-Reproduce supported historical algorithms or reject them explicitly. Original
-prototype JSON imports retain honeycomb revision 1 and standalone geometry;
-adding a collar is an explicit upgrade. Do not run executable imports.
+Validate historical JSON against its original parameter definitions before
+migrating it. The editor opens projects with the current geometry and carries
+over compatible settings. Do not run executable imports.
 
 Regenerate `public/project.schema.json` with `npm run schema` after an intentional
 schema change. Add historical fixtures and migration tests. Generated mesh arrays

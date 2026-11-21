@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import Module from 'manifold-3d';
 import { generateAssembly } from '../src/generators/assembly.ts';
-import { createDesign, decodeDesign, encodeDesign, upgradePrintDesign, validateDesign } from '../src/domain/project.ts';
+import { createDesign, decodeDesign, encodeDesign, validateDesign } from '../src/domain/project.ts';
 import { attachments, lamps, mountFields } from '../src/catalog/registry.ts';
 import { encodeProject } from '../src/project.ts';
 import { defaultGrid } from '../src/geometry/profile.ts';
@@ -40,8 +40,11 @@ test('mount and attachment parameter limits remain connected and clear mandatory
 test('settings preserve revisions and reject unsupported definitions and modes', () => {
   const project = createDesign(); assert.deepEqual(decodeDesign(encodeDesign(project)), project);
   const legacy = decodeDesign(encodeProject(defaultGrid));
-  assert.equal(legacy.attachment.revision, 1); assert.equal(legacy.assembly.mode, 'standalone');
-  assert.deepEqual(legacy.attachment.parameters, defaultGrid);
+  assert.equal(legacy.attachment.revision, project.attachment.revision);
+  assert.equal(legacy.assembly.mode, 'integrated');
+  assert.deepEqual(legacy.mount, project.mount);
+  assert.deepEqual(legacy.attachment.parameters, { ...project.attachment.parameters, ...defaultGrid });
+  generateAssembly(kernel, legacy);
   project.lamp.revision = 9; assert.throws(() => validateDesign(project), /Unsupported definition/);
   const modular = { ...createDesign(), assembly: { mode: 'modular', connection: null } };
   assert.throws(() => validateDesign(modular), /invalid project/);
@@ -129,7 +132,7 @@ test('upgrading the earlier tab mount preserves current attachment settings and 
   old.assembly.mode = 'fit-test';
   old.attachment.parameters.depth = 10;
   assert.equal(generateAssembly(kernel, old).parts.length, 1);
-  const upgraded = upgradePrintDesign(old);
+  const upgraded = decodeDesign(encodeDesign(old));
   assert.equal(upgraded.mount!.revision, 5);
   assert.equal(upgraded.assembly.mode, 'fit-test');
   assert.deepEqual(upgraded.attachment, old.attachment);

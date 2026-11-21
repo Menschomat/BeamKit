@@ -62,15 +62,10 @@ export function decodeDesign(json: string): Design {
     project.name = 'Imported original grid'; project.mount = null;
     project.attachment = { id: 'honeycomb', revision: 1, parameters };
     project.assembly.mode = 'standalone';
-    return validateDesign(project);
+    return useCurrentDesign(validateDesign(project));
   }
   if (data?.engine?.generatorVersion === '0.2.0' && data.export && data.export.orientation === undefined) data.export.orientation = 'assembly';
-  return validateDesign(data);
-}
-export function upgradeLegacy(project: Design): Design {
-  const next = createDesign(); next.name = project.name;
-  next.attachment.parameters = { ...next.attachment.parameters, ...project.attachment.parameters };
-  return next;
+  return useCurrentDesign(validateDesign(data));
 }
 export function printDiagnostics(project: Design): Diagnostic[] {
   const notes: Diagnostic[] = [
@@ -91,17 +86,44 @@ export function printDiagnostics(project: Design): Diagnostic[] {
 // Original JSON encoding stays available for users who need the historical grid format.
 export { encodeLegacy };
 
-export function upgradePrintDesign(project: Design): Design {
-  const next = createDesign();
-  next.name = project.name; next.printProfile = { ...project.printProfile };
+function useCurrentDesign(project: Design): Design {
   const attachment = attachments.find(entry => entry.id === project.attachment.id)!;
-  next.attachment = { id: attachment.id, revision: attachment.revision, parameters: { ...attachment.defaults, ...project.attachment.parameters } };
-  if (project.attachment.id === 'honeycomb' && project.attachment.revision < 3 && next.attachment.parameters.frame === 2) next.attachment.parameters.frame = 1.6;
-  if (project.attachment.revision < attachment.revision) next.attachment.parameters.depth = Math.max(next.attachment.parameters.depth, attachment.defaults.depth);
-  if (project.mount && next.mount) {
-    const { engagementMm, retainingLipMm } = next.mount.parameters;
-    next.mount.parameters = { ...project.mount.parameters, engagementMm, retainingLipMm };
+  const mount = mounts[0];
+  const olderAttachment = project.attachment.revision < attachment.revision;
+  const olderMount = project.mount !== null && project.mount.revision < mount.revision;
+  if (!olderAttachment && !olderMount) return project;
+
+  const originalGrid = project.attachment.id === 'honeycomb' && project.attachment.revision === 1;
+  const next = createDesign();
+  next.name = project.name;
+  next.lamp = project.lamp;
+  next.printProfile = project.printProfile;
+  next.assembly.mode = originalGrid ? 'integrated' : project.assembly.mode;
+  next.attachment = { id: attachment.id, revision: attachment.revision, parameters: {
+    ...attachment.defaults, ...project.attachment.parameters,
+  } };
+  for (const field of attachment.fields) {
+    const value = next.attachment.parameters[field.key];
+    next.attachment.parameters[field.key] = Math.min(field.max, Math.max(field.min, value));
   }
-  next.assembly.mode = project.assembly.mode;
+  if (olderAttachment) {
+    const parameters = next.attachment.parameters;
+    // Historical shallow grids and holders may need extra depth for the print ramps.
+    const minimumDepth = attachment.id === 'diffusion-sheet-holder'
+      ? Math.max(attachment.defaults.depth, 3.5 + Math.SQRT2 * parameters.ledge + 2 * parameters.sheetThickness)
+      : attachment.defaults.depth;
+    parameters.depth = Math.max(parameters.depth, minimumDepth);
+  }
+  if (project.mount && next.mount) {
+    if (olderMount) {
+      const { engagementMm, retainingLipMm } = next.mount.parameters;
+      next.mount.parameters = { ...project.mount.parameters, engagementMm,
+        retainingLipMm: project.mount.revision === 4 ? project.mount.parameters.retainingLipMm : retainingLipMm };
+    } else {
+      next.mount = project.mount;
+    }
+  } else if (!originalGrid) {
+    next.mount = null;
+  }
   return validateDesign(next);
 }

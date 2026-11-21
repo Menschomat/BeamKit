@@ -82,3 +82,40 @@ test('a failed geometry worker load can retry without losing settings', async ({
   await page.getByRole('button', { name: 'Retry generation', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
 });
+
+test('an older autosave opens the current corner model without an upgrade banner', async ({ page }) => {
+  await page.goto('/');
+  const exportStl = page.getByRole('button', { name: 'Export STL', exact: true });
+  await expect(exportStl).toBeEnabled();
+  await expect(page.getByRole('status')).toContainText('Saved locally');
+  await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('beamkit', 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction('projects', 'readwrite');
+        const store = tx.objectStore('projects');
+        const request = store.get('_autosave');
+        request.onsuccess = () => {
+          const old = JSON.parse(request.result);
+          old.mount.revision = 4;
+          old.mount.parameters.engagementMm = 16.5;
+          old.attachment.parameters.depth = 17;
+          store.put(JSON.stringify(old), '_autosave');
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } finally { db.close(); }
+  });
+  await page.reload();
+  await expect(exportStl).toBeEnabled();
+  await expect(page.getByRole('spinbutton', { name: 'Depth', exact: true })).toHaveValue('17');
+  await expect(page.getByText('The new mount uses smaller hooks on all four corners.')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Use four corner clips' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Fit', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Corner clip depth', exact: true })).toHaveValue('14.5');
+});
