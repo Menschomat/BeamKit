@@ -1,4 +1,4 @@
-# Contributing to Lightform
+# Contributing to BeamKit
 
 Use Node 24 and npm. Run `npm ci`, then `npm run dev`. Run `npm run check`, `npm test`, and `npm run build` before opening a pull request. Update the lockfile with intentional dependency changes. Keep generated builds, private CAD assets and secrets out of Git.
 

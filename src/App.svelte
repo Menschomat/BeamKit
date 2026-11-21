@@ -129,7 +129,7 @@
 
 <header class="flex flex-wrap items-center justify-between gap-4 border-b border-line px-5 py-4">
   <div class="flex items-baseline gap-3">
-    <h1 class="text-2xl font-bold tracking-tight">Lightform</h1>
+    <h1 class="text-2xl font-bold tracking-tight">BeamKit</h1>
     <span class="text-sm text-muted">Lamp attachment designer</span>
   </div>
   <div class="flex flex-wrap gap-2">

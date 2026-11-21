@@ -226,7 +226,7 @@ Use controlled photo/lux comparisons for optical presets later. Any illustrative
 
 ## 12. Provenance and scope boundaries
 
-Application code is MIT licensed. Lightform dedicates its rights, if any, in its original generated accessory geometry under CC0 1.0 Universal, which permits commercial reuse without attribution. Include the SPDX identifier and canonical CC0 URL in the export interface and export bundle. This dedication covers project-owned output and leaves third-party and user-contributed rights with their holders.
+Application code is MIT licensed. BeamKit dedicates its rights, if any, in its original generated accessory geometry under CC0 1.0 Universal, which permits commercial reuse without attribution. Include the SPDX identifier and canonical CC0 URL in the export interface and export bundle. This dedication covers project-owned output and leaves third-party and user-contributed rights with their holders.
 
 The previously consulted community model by 727Thing (Thingiverse item 7402666) remains a private measurement reference. Keep its archive, meshes, images and conversions out of the repository, build and exported models. Record the provenance of future measured profiles and maintain an independent procedural preview.
 

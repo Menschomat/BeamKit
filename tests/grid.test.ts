@@ -19,7 +19,9 @@ test('grid profiles preserve aperture bounds and shared wall thickness', () => {
 
 test('settings round-trip and reject invalid numbers and future revisions', () => {
   const encoded = encodeProject(defaultGrid);
+  assert.equal(JSON.parse(encoded).format, 'beamkit-grid-prototype');
   assert.deepEqual(decodeProject(encoded), defaultGrid);
+  assert.deepEqual(decodeProject(encoded.replace('beamkit-grid-prototype', 'lightform-grid-prototype')), defaultGrid);
   assert.throws(() => decodeProject(encoded.replace('"depth": 12', '"depth": "12"')), /Depth/);
   assert.throws(() => decodeProject(encoded.replace('"schemaVersion": 1', '"schemaVersion": 2')), /supported/);
 });
@@ -35,7 +37,7 @@ test('binary STL preserves millimetre coordinates and the output dedication', ()
   assert.equal(data.getFloat32(92, true), 1);
   assert.equal(data.getFloat32(108, true), 6);
   assert.equal(data.getFloat32(124, true), 12);
-  assert.match(new TextDecoder().decode(stl.slice(0, 80)), /CC0-1\.0/);
+  assert.match(new TextDecoder().decode(stl.slice(0, 80)), /^BeamKit \| mm \| CC0-1\.0/);
 });
 
 test('procedural reference includes the inset, rear seam, and schematic side markers', () => {

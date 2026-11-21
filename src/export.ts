@@ -5,7 +5,7 @@ export function binaryStl({ positions, indices }: GridMesh) {
   const triangleCount = indices.length / 3;
   const data = new ArrayBuffer(84 + triangleCount * 50);
   const bytes = new Uint8Array(data);
-  bytes.set(new TextEncoder().encode(`Lightform | mm | ${outputLicense} | ${licenseUrl}`));
+  bytes.set(new TextEncoder().encode(`BeamKit | mm | ${outputLicense} | ${licenseUrl}`));
   const view = new DataView(data);
   view.setUint32(80, triangleCount, true);
   for (let face = 0; face < triangleCount; face++) {

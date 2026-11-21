@@ -1,4 +1,4 @@
-# Lightform
+# BeamKit
 
 A browser-based designer for printable lamp accessories. The initial prototype generates a P96L honeycomb grid and shows it against an original wireframe of the lamp. Grid dimensions are editable, settings can be imported and exported as JSON, and STL data uses millimetres.
 

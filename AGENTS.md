@@ -1,4 +1,4 @@
-# Lightform agent instructions
+# BeamKit agent instructions
 
 Read PROJECT_PLAN.md and CONTRIBUTING.md before changing the app. Use feature branches and Conventional Commits. Keep existing work intact. Commit only files in scope and never publish or deploy without authorization.
 
