@@ -81,7 +81,11 @@ export function printDiagnostics(project: Design): Diagnostic[] {
   if (wall < 0.8) notes.push({ level: 'warning', code: 'thin-wall', message: 'Walls below 0.8 mm leave fewer than two nominal 0.4 mm nozzle paths. Check wall generation in your slicer.' });
   if (project.mount && project.mount.parameters.engagementMm <= 11.5 && project.mount.parameters.retainingLipMm > 0) notes.push({ level: 'info', code: 'lip-omitted', message: 'Rear lips are omitted because engagement does not extend behind the 11.5 mm housing.' });
   if (project.printProfile.material === 'unspecified') notes.push({ level: 'info', code: 'material', message: 'Choose a material in your slicer and test temperature performance on the lamp.' });
-  if ((project.mount?.revision ?? 0) >= 3) notes.push({ level: 'warning', code: 'snap-prototype', message: 'Two spring tabs use the recessed right-side dimensions. Click force, rear-corner clearance and fatigue are unverified; test the fit coupon in the intended material.' });
+  if ((project.mount?.revision ?? 0) >= 3) notes.push({ level: 'warning', code: 'snap-prototype', message: 'Test click force, release and retention using the fit coupon and your intended material.' });
+  if (project.mount && project.mount.revision >= 4 &&
+      project.mount.parameters.retainingLipMm <= 1.5 + project.mount.parameters.fitClearancePerSideMm) {
+    notes.push({ level: 'warning', code: 'corner-overlap', message: 'Hook reach does not overlap the modeled rear shoulder at this clearance. Increase hook reach or reduce fit clearance.' });
+  }
   return notes;
 }
 // Original JSON encoding stays available for users who need the historical grid format.
@@ -92,8 +96,12 @@ export function upgradePrintDesign(project: Design): Design {
   next.name = project.name; next.printProfile = { ...project.printProfile };
   const attachment = attachments.find(entry => entry.id === project.attachment.id)!;
   next.attachment = { id: attachment.id, revision: attachment.revision, parameters: { ...attachment.defaults, ...project.attachment.parameters } };
-  if (next.attachment.id === 'honeycomb' && next.attachment.parameters.frame === 2) next.attachment.parameters.frame = 1.6;
-  next.attachment.parameters.depth = Math.max(next.attachment.parameters.depth, attachment.defaults.depth);
-  if (project.mount) next.mount!.parameters = { ...next.mount!.parameters, ...project.mount.parameters, engagementMm: 14.5, retainingLipMm: 1.3, accessCutoutWidthMm: 85 };
+  if (project.attachment.id === 'honeycomb' && project.attachment.revision < 3 && next.attachment.parameters.frame === 2) next.attachment.parameters.frame = 1.6;
+  if (project.attachment.revision < attachment.revision) next.attachment.parameters.depth = Math.max(next.attachment.parameters.depth, attachment.defaults.depth);
+  if (project.mount && next.mount) {
+    const { engagementMm, retainingLipMm } = next.mount.parameters;
+    next.mount.parameters = { ...project.mount.parameters, engagementMm, retainingLipMm };
+  }
+  next.assembly.mode = project.assembly.mode;
   return validateDesign(next);
 }

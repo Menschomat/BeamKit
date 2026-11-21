@@ -5,7 +5,7 @@ Material and layer height: choose and record in the slicer. No material is
 currently qualified for heat exposure on this lamp.
 
 Select **Advanced test tools → Fit coupon only** and export STL before printing a full accessory. This produces only the
-original collar, front support and two prototype spring tabs, without the honeycomb,
+original collar, front support and two prototype right-corner hooks, without the honeycomb,
 diffusion material, procedural lamp preview, or access-volume overlays.
 
 ## Slicer checks, left to the user
@@ -23,8 +23,8 @@ diffusion material, procedural lamp preview, or access-volume overlays.
 ## Hardware checks
 
 Record lamp revision, material, nozzle, layer height, clearances and observations.
-Start with 0.3 mm fit clearance **per side**, 1.6 mm support thickness, 14.5 mm
-spring tab length and 1.3 mm hook reach. These are experimental defaults.
+Start with 0.3 mm fit clearance **per side**, 1.6 mm support thickness, 16.5 mm
+corner clip depth and 2.1 mm hook reach. These are experimental defaults.
 Do not force a tight part onto the lamp. Change clearance and print another fit
 test if necessary. Access cuts cannot remove less than the mandatory keepouts.
 

@@ -139,7 +139,7 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
         const y1 = sign < 0 ? -cavity.height / 2 + 0.2 : outerShape.height;
         collar = own(collar.subtract(box({ min: [-m.accessCutoutWidthMm / 2, y0, -m.engagementMm - 1], max: [m.accessCutoutWidthMm / 2, y1, m.diffuserClearanceMm - 0.1] })));
       }
-      if (project.mount.revision >= 3) {
+      if (project.mount.revision === 3) {
         const sideX = lamp.body.width / 2 - (lamp.mountingFacts?.rightSideInsetMm ?? 0.8) + fit;
         // Leave the right side open except two spring tongues and the corner anchors.
         collar = own(collar.subtract(box({
@@ -161,6 +161,38 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
           const hook = own(own(own(hookProfile.extrude(6)).rotate([90, 0, 0])).translate([0, centerY + 3, 0]));
           collar = own(own(own(collar.add(arm)).add(root)).add(hook));
         }
+      }
+      if (project.mount.revision >= 4) {
+        const sideX = cavity.width / 2;
+        const straightEdgeEnd = lamp.body.height / 2 - lamp.body.radius;
+        const gapEnd = straightEdgeEnd - 1.5;
+        collar = own(collar.subtract(box({
+          min: [sideX - 0.05, -gapEnd, -m.engagementMm - 0.1],
+          max: [outerShape.width, gapEnd, m.diffuserClearanceMm],
+        })));
+
+        // The existing corner walls carry the hooks. Keep the ramps inside the outer corner contour.
+        const hookReach = m.retainingLipMm;
+        const hookX = sideX - hookReach;
+        const rampLength = hookReach + 0.05;
+        const rearInset = lamp.mountingFacts?.rearFaceInsetMm ?? 1.5;
+        const rearRollMm = 0.75;
+        const slope = hookReach / rampLength;
+        const rearEdgeX = lamp.body.width / 2 - rearInset;
+        const rolledEdgeX = rearEdgeX + Math.hypot(rearInset, slope * rearRollMm) - slope * rearRollMm;
+        const peakZ = -lamp.body.depth - Math.max(0.5, (rolledEdgeX + 0.1 - hookX) / slope);
+        const cornerShell = extrude(section(outerShape), m.engagementMm + m.diffuserClearanceMm, -m.engagementMm);
+        const hookProfile = own(new CrossSection([[
+          [sideX, peakZ - rampLength], [outerShape.width / 2, peakZ - rampLength],
+          [outerShape.width / 2, peakZ + rampLength], [sideX, peakZ + rampLength], [hookX, peakZ],
+        ]]));
+        const hookStrip = own(own(hookProfile.extrude(3)).rotate([90, 0, 0]));
+        for (const endY of [-gapEnd, gapEnd + 3]) {
+          const hook = own(own(hookStrip.translate([0, endY, 0])).intersect(cornerShell));
+          collar = own(collar.add(hook));
+        }
+      }
+      if (project.mount.revision >= 3) {
         // Four small original bezel seats establish a real Z=0 stop; the diffuser remains clear.
         const bezel = own(section({ width: lamp.aperture.width + 2, height: lamp.aperture.height + 2, radius: lamp.aperture.radius + 1 }).subtract(section(lamp.aperture)));
         const seatRing = extrude(bezel, m.diffuserClearanceMm + thickness, 0);

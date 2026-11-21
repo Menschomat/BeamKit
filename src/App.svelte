@@ -221,7 +221,7 @@
       <details class="diagnostics" open><summary><span class="warning-dot"></span>Print notes <span>{diagnostics.length}</span></summary>{#each diagnostics as note}<p class:warning={note.level === 'warning'}>{note.message}</p>{/each}</details>
     </aside>
   </main>
-  {#if project.mount && project.mount.revision < 3}<div class="notice"><span>Earlier geometry preserved. A new revision adds two open-side spring tabs, print ramps and a lighter frame.</span><button onclick={() => replace(upgradePrintDesign(project))}>Use print-optimized design</button></div>{/if}
+  {#if project.mount && project.mount.revision < mounts[0].revision}<div class="notice"><span>The new mount puts the hooks in the right corners and opens the space between them.</span><button onclick={() => replace(upgradePrintDesign(project))}>Use corner clips</button></div>{/if}
   {#if project.attachment.id === 'honeycomb' && project.attachment.revision === 1}<div class="notice"><span>Original grid revision preserved. Adding a collar changes the geometry.</span><button onclick={() => replace(upgradeLegacy(project))}>Upgrade to collar design</button></div>{/if}
   <footer class="status-bar"><span role="status"><i class:ready={current}></i>{status}{#if current && result}<span class="status-detail"> · {Math.round(result.elapsedMs)} ms · 1 connected part{#if result.printAnalysis && result.printAnalysis.steepOverhangAreaMm2 < 0.00001} · 45° check passed{/if}</span>{/if} · {saving ? 'Saving…' : saved ? 'Saved locally' : 'Not saved'}{#if offlineReady} · Offline ready{/if}</span><a href={licenseUrl} target="_blank" rel="noreferrer">Generated output · CC0 1.0 ↗</a></footer>
 </div>

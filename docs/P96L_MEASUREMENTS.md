@@ -33,7 +33,7 @@ both dials and switches while the lamp is mounted.
 Only dimensional facts and original simple primitives are used in public source.
 No source B-rep, mesh topology, materials, markings, images or textures are copied.
 
-At the two right-side tab positions (Y = ±8 mm), cross-sections of the
+For the earlier revision, at the two right-side tab positions (Y = ±8 mm), cross-sections of the
 private reference reach X = 54.2 mm through most of the housing depth. The
 rear flat face reaches X = 53.5 mm. The default tab inner face is X = 54.5 mm,
 with a ramped tip at X = 53.2 mm, behind the rear face. Four narrow bezel seats
@@ -46,3 +46,9 @@ In app coordinates, the surrounds lie at X = −54.2 mm. Their Y spans are
 and the upper reaches about X = −54.52 mm. The top switch and button have
 separate outlines at their respective protrusion planes. These are procedural
 markers based on the STEP face bounds.
+
+The current mount instead uses the existing right corners. The hook strips
+start at Y = ±22.5 mm, near the straight corner contact faces (STEP faces 93
+and 94), and extend 3 mm toward the corners. A sloped hook clears the modeled
+rear roll-off before reaching inside the rear shoulder. The middle 45 mm of
+the right edge remains open. Flex and retention need a printed fit test.

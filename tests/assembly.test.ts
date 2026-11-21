@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import Module from 'manifold-3d';
 import { generateAssembly } from '../src/generators/assembly.ts';
-import { createDesign, decodeDesign, encodeDesign, validateDesign } from '../src/domain/project.ts';
+import { createDesign, decodeDesign, encodeDesign, upgradePrintDesign, validateDesign } from '../src/domain/project.ts';
 import { attachments, lamps, mountFields } from '../src/catalog/registry.ts';
 import { encodeProject } from '../src/project.ts';
 import { defaultGrid } from '../src/geometry/profile.ts';
@@ -101,21 +101,34 @@ test('print-optimized honeycomb preserves the footprint and eliminates steep loc
   }
 });
 
-test('right-side spring tabs leave three gaps and overlap the reference rear shoulder', () => {
+test('corner hooks leave the center of the right edge open and catch the modeled rear shoulder', () => {
   const { mesh } = generateAssembly(kernel, createDesign()).parts[0];
   const solid = new kernel.Manifold(new kernel.Mesh({
     numProp: 3, vertProperties: mesh.positions, triVerts: mesh.indices,
   }));
   try {
-    for (const y of [-18, 0, 18]) {
-      assert.equal(solid.rayCast([60, y, -12], [52, y, -12]).length, 0);
+    for (const y of [-22, -8, 0, 8, 22]) {
+      for (const z of [-8, -12.8]) assert.equal(solid.rayCast([60, y, z], [52, y, z]).length, 0);
     }
-    for (const y of [-8, 8]) {
-      const hits = solid.rayCast([60, y, -12], [52, y, -12]);
+    for (const y of [-23, 23]) {
+      const hits = solid.rayCast([60, y, -12.8], [52, y, -12.8]);
       assert.equal(hits.length, 2);
-      assert.ok(Math.abs(hits[1].position[0] - 53.2) < 0.001);
+      assert.ok(hits[1].position[0] < 53.5, 'Hook overlaps the reference rear shoulder');
       const housingHeightHits = solid.rayCast([60, y, -8], [52, y, -8]);
-      assert.ok(Math.abs(housingHeightHits[1].position[0] - 54.5) < 0.001);
+      assert.ok(Math.abs(housingHeightHits[1].position[0] - 55.3) < 0.001);
     }
   } finally { solid.delete(); }
+});
+
+test('upgrading the earlier tab mount preserves current attachment settings and output mode', () => {
+  const old = createDesign();
+  old.mount!.revision = 3;
+  Object.assign(old.mount!.parameters, { engagementMm: 14.5, retainingLipMm: 1.3 });
+  old.assembly.mode = 'fit-test';
+  old.attachment.parameters.depth = 10;
+  assert.equal(generateAssembly(kernel, old).parts.length, 1);
+  const upgraded = upgradePrintDesign(old);
+  assert.equal(upgraded.mount!.revision, 4);
+  assert.equal(upgraded.assembly.mode, 'fit-test');
+  assert.deepEqual(upgraded.attachment, old.attachment);
 });
