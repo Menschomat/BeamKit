@@ -27,20 +27,42 @@ export function createViewport(host: HTMLElement) {
   const apertureLine = new LineBasicMaterial({ color: '#a94635', transparent: true, depthWrite: false });
   const housingTint = new MeshBasicMaterial({ color: '#858791', transparent: true, depthWrite: false });
   const apertureTint = new MeshBasicMaterial({ color: '#ff634a', transparent: true, depthWrite: false });
+  const housingDepth = new MeshBasicMaterial({
+    transparent: true, colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+  });
 
   // Use the procedural reference contours for the translucent viewport surfaces.
-  const [front, , , aperture] = reference.loops;
+  const [front, , rearSeam, aperture, ...markers] = reference.loops;
   const housing = new ExtrudeGeometry(new Shape(front.map(([x, y]) => new Vector2(x, y))), {
     depth: profile.body.depth, bevelEnabled: false,
   });
   housing.translate(0, 0, -profile.body.depth);
+  // Write the visible housing depth before drawing the tinted surfaces and outlines.
+  // This keeps back-side lines from showing through the controls.
+  const housingMask = new Mesh(housing, housingDepth);
+  housingMask.renderOrder = -1;
+  lamp.add(housingMask);
   const housingMesh = new Mesh(housing, housingTint);
   lamp.add(housingMesh);
   const apertureMesh = new Mesh(new ShapeGeometry(new Shape(aperture.map(([x, y]) => new Vector2(x, y)))), apertureTint);
   apertureMesh.renderOrder = 1;
   lamp.add(apertureMesh);
-  for (const loop of reference.loops) {
-    const outline = new LineLoop(new BufferGeometry().setFromPoints(loop.map(p => new Vector3(...p))),
+  const bay = profile.detail.leftControlBay;
+  const bayPlane = bay ? -profile.body.width / 2 + bay.insetMm : undefined;
+  const seamSegments = rearSeam.flatMap((point, i) => {
+    const next = rearSeam[(i + 1) % rearSeam.length];
+    return point[0] === bayPlane && next[0] === bayPlane ? [] : [point, next];
+  });
+  const seam = new LineSegments(new BufferGeometry().setFromPoints(seamSegments.map(p => new Vector3(...p))), lines);
+  seam.renderOrder = 2;
+  lamp.add(seam);
+  for (const [i, loop] of [front, reference.loops[1], aperture, ...markers].entries()) {
+    // Project the measured opening outlines onto the visible bay wall instead of drawing
+    // them behind the simplified housing surface.
+    const markerPlane = bayPlane !== undefined && i >= 3 && profile.detail.markers[i - 3].side === 'left-edge'
+      ? bayPlane - 0.01 : undefined;
+    const points = loop.map(([x, y, z]) => new Vector3(markerPlane ?? x, y, z));
+    const outline = new LineLoop(new BufferGeometry().setFromPoints(points),
       loop === aperture ? apertureLine : lines);
     outline.renderOrder = 2;
     lamp.add(outline);
@@ -121,8 +143,9 @@ export function createViewport(host: HTMLElement) {
     },
     dispose() {
       resize.disconnect(); controls.dispose(); clearParts(); material.dispose();
-      lamp.children.forEach(object => (object as Mesh | LineLoop | LineSegments).geometry.dispose());
-      for (const material of [lines, apertureLine, housingTint, apertureTint]) material.dispose();
+      const referenceGeometries = new Set(lamp.children.map(object => (object as Mesh | LineLoop | LineSegments).geometry));
+      referenceGeometries.forEach(geometry => geometry.dispose());
+      for (const material of [lines, apertureLine, housingTint, apertureTint, housingDepth]) material.dispose();
       keepouts.children.forEach(line => (line as LineSegments).geometry.dispose()); keepoutMaterial.dispose();
       floor.geometry.dispose(); floor.material.dispose(); renderer.dispose(); renderer.domElement.remove();
     },
