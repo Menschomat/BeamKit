@@ -44,6 +44,8 @@ test('procedural reference includes the inset, rear seam, and schematic side mar
   const { loops, segments } = lampReferenceLines(p96l);
   const [front, rear, seam, aperture, port, topSwitch, topButton, leftLowerRecess, leftUpperRecess, leftLowerDial, leftUpperDial] = loops;
   assert.ok(front.every((point) => point[2] === 0));
+  assert.ok(front.some(([x, y]) => x === -54.2 && y === 20.65));
+  assert.ok(rear.some(([x, y]) => x === -54.2 && y === -20.65));
   assert.ok(rear.every((point) => point[2] === -11.5));
   assert.ok(seam.every((point) => point[2] === -9));
   assert.equal(Math.max(...aperture.map(([x]) => x)), 52.5);
@@ -54,8 +56,8 @@ test('procedural reference includes the inset, rear seam, and schematic side mar
   const expectedLeft = [
     { plane: -54.2, mins: [-19.55, -9.4], maxes: [-1.4, -4.6] },
     { plane: -54.2, mins: [3.65, -8.1], maxes: [19.95, -3.8] },
-    { plane: -55.4, mins: [-16.61, -8], maxes: [-4.34, -6] },
-    { plane: -54.52, mins: [4.91, -6.8], maxes: [18.69, -5.1] },
+    { plane: -53.2, mins: [-18.55, -8.4], maxes: [-2.4, -5.6] },
+    { plane: -53.2, mins: [4.65, -7.1], maxes: [18.95, -4.8] },
   ];
   for (const [i, loop] of [leftLowerRecess, leftUpperRecess, leftLowerDial, leftUpperDial].entries()) {
     const { plane, mins, maxes } = expectedLeft[i];
