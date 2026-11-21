@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { p96l } from './catalog/p96l.ts';
   import { defaultGrid, gridFields, validateGrid } from './geometry/profile.ts';
-  import type { GridMesh, GridResponse } from './geometry/protocol.ts';
+  import type { GridMesh, GridRequest, GridResponse } from './geometry/protocol.ts';
   import { binaryStl, download } from './export.ts';
   import { decodeProject, encodeProject, licenseUrl } from './project.ts';
   import { createViewport } from './viewport.ts';
@@ -20,10 +20,20 @@
   let worker: Worker | undefined;
   let requestId = 0;
   let timer: ReturnType<typeof setTimeout>;
+  let pending: GridRequest | undefined;
+  let active: number | undefined;
+
+  function dispatchLatest() {
+    if (!worker || !pending || active !== undefined) return;
+    active = pending.id;
+    worker.postMessage(pending);
+    pending = undefined;
+  }
 
   function rebuild() {
     const id = ++requestId;
     clearTimeout(timer);
+    pending = undefined;
     current = false;
     try {
       validateGrid(settings);
@@ -36,9 +46,10 @@
       return;
     }
     status = 'Generating grid…';
-    timer = setTimeout(() => worker?.postMessage({
-      id, aperture: p96l.aperture, settings: { ...settings },
-    }), 120);
+    timer = setTimeout(() => {
+      pending = { id, aperture: p96l.aperture, settings: { ...settings } };
+      dispatchLatest();
+    }, 120);
   }
 
   onMount(() => {
@@ -49,6 +60,9 @@
     }
     worker = new Worker(new URL('./geometry/grid.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = ({ data }: MessageEvent<GridResponse>) => {
+      if (data.id !== active) return;
+      active = undefined;
+      dispatchLatest();
       if (data.id !== requestId) return;
       if ('error' in data) {
         status = data.error;

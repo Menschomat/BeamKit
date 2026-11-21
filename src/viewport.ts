@@ -5,7 +5,7 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { p96l } from './catalog/p96l.ts';
-import { roundedOutline } from './geometry/profile.ts';
+import { lampReferenceLines } from './geometry/lamp-reference.ts';
 import type { GridMesh } from './geometry/protocol.ts';
 
 export function createViewport(host: HTMLElement) {
@@ -30,17 +30,12 @@ export function createViewport(host: HTMLElement) {
 
   const lamp = new Group();
   const lines = new LineBasicMaterial({ color: '#64646c' });
-  const body = roundedOutline(p96l.body);
-  for (const [outline, z] of [
-    [body, 0], [body, -11.5], [body, -9], [roundedOutline(p96l.aperture), 0],
-  ] as const) {
-    lamp.add(new LineLoop(new BufferGeometry().setFromPoints(
-      outline.map(([x, y]) => new Vector3(x, y, z)),
-    ), lines));
+  const reference = lampReferenceLines(p96l);
+  for (const loop of reference.loops) {
+    const points = loop.map(([x, y, z]) => new Vector3(x, y, z));
+    lamp.add(new LineLoop(new BufferGeometry().setFromPoints(points), lines));
   }
-  const uprights = body.filter((_, index) => index % 9 === 0).flatMap(([x, y]) => [
-    new Vector3(x, y, 0), new Vector3(x, y, -11.5),
-  ]);
+  const uprights = reference.segments.map(([x, y, z]) => new Vector3(x, y, z));
   lamp.add(new LineSegments(new BufferGeometry().setFromPoints(uprights), lines));
   scene.add(lamp);
 

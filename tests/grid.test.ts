@@ -3,6 +3,7 @@ import test from 'node:test';
 import { p96l } from '../src/catalog/p96l.ts';
 import { defaultGrid, hexagons, roundedOutline } from '../src/geometry/profile.ts';
 import { binaryStl } from '../src/export.ts';
+import { lampReferenceLines } from '../src/geometry/lamp-reference.ts';
 import { decodeProject, encodeProject } from '../src/project.ts';
 
 test('grid profiles preserve aperture bounds and shared wall thickness', () => {
@@ -35,4 +36,16 @@ test('binary STL preserves millimetre coordinates and the output dedication', ()
   assert.equal(data.getFloat32(108, true), 6);
   assert.equal(data.getFloat32(124, true), 12);
   assert.match(new TextDecoder().decode(stl.slice(0, 80)), /CC0-1\.0/);
+});
+
+test('procedural reference includes the inset, rear seam, and schematic side markers', () => {
+  const { loops, segments } = lampReferenceLines(p96l);
+  const [front, rear, seam, aperture, port, control] = loops;
+  assert.ok(front.every((point) => point[2] === 0));
+  assert.ok(rear.every((point) => point[2] === -11.5));
+  assert.ok(seam.every((point) => point[2] === -9));
+  assert.equal(Math.max(...aperture.map(([x]) => x)), 52.5);
+  assert.ok(port.every((point) => point[1] === -30));
+  assert.ok(control.every((point) => point[1] === 30));
+  assert.equal(segments.length, 8);
 });
