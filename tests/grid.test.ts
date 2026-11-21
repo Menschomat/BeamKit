@@ -42,13 +42,30 @@ test('binary STL preserves millimetre coordinates and the output dedication', ()
 
 test('procedural reference includes the inset, rear seam, and schematic side markers', () => {
   const { loops, segments } = lampReferenceLines(p96l);
-  const [front, rear, seam, aperture, port, control] = loops;
+  const [front, rear, seam, aperture, port, topSwitch, topButton, leftLowerRecess, leftUpperRecess, leftLowerDial, leftUpperDial] = loops;
   assert.ok(front.every((point) => point[2] === 0));
   assert.ok(rear.every((point) => point[2] === -11.5));
   assert.ok(seam.every((point) => point[2] === -9));
   assert.equal(Math.max(...aperture.map(([x]) => x)), 52.5);
   assert.ok(port.every((point) => point[1] === -30));
-  assert.ok(control.every((point) => point[1] === 30));
+  assert.ok(topSwitch.every((point) => point[1] === 31.2));
+  assert.ok(topButton.every((point) => point[1] === 30.2));
+  assert.ok(Math.max(...topSwitch.map(([x]) => x)) < Math.min(...topButton.map(([x]) => x)));
+  const expectedLeft = [
+    { plane: -54.2, mins: [-19.55, -9.4], maxes: [-1.4, -4.6] },
+    { plane: -54.2, mins: [3.65, -8.1], maxes: [19.95, -3.8] },
+    { plane: -55.4, mins: [-16.61, -8], maxes: [-4.34, -6] },
+    { plane: -54.52, mins: [4.91, -6.8], maxes: [18.69, -5.1] },
+  ];
+  for (const [i, loop] of [leftLowerRecess, leftUpperRecess, leftLowerDial, leftUpperDial].entries()) {
+    const { plane, mins, maxes } = expectedLeft[i];
+    assert.ok(loop.every(([x]) => Math.abs(x - plane) < 0.001));
+    for (const axis of [1, 2] as const) {
+      const coordinates = loop.map(point => point[axis]);
+      assert.ok(Math.abs(Math.min(...coordinates) - mins[axis - 1]) < 0.001);
+      assert.ok(Math.abs(Math.max(...coordinates) - maxes[axis - 1]) < 0.001);
+    }
+  }
   assert.equal(segments.length, 8);
 });
 

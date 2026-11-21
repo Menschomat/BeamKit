@@ -10,7 +10,10 @@ export type LampReference = {
     rearSeamFromBack: number;
     markers: readonly {
       side: 'front-edge' | 'back-edge' | 'left-edge';
-      centerX: number;
+      /** X on the long sides, Y on the left edge. */
+      centerAlongEdge: number;
+      /** Distance from the nominal wall, positive toward the outside. */
+      outwardOffset?: number;
       centerZ: number;
       width: number;
       height: number;
@@ -28,10 +31,12 @@ export function lampReferenceLines({ body, aperture, detail }: LampReference) {
     onPlane(body, -body.depth),
     onPlane(body, -body.depth + detail.rearSeamFromBack),
     onPlane(aperture, 0),
-    ...detail.markers.map(({ side, centerX, centerZ, ...shape }): Point3[] => {
-      const edge = side === 'front-edge' ? -body.height / 2 : body.height / 2;
-      return roundedOutline(shape).map(([x, z]) => side === 'left-edge'
-        ? [-body.width / 2, centerX + x, centerZ + z] : [centerX + x, edge, centerZ + z]);
+    ...detail.markers.map(({ side, centerAlongEdge, centerZ, outwardOffset = 0, ...shape }): Point3[] => {
+      const shortSidePlane = body.width / 2 + outwardOffset;
+      const longSidePlane = (side === 'front-edge' ? -1 : 1) * (body.height / 2 + outwardOffset);
+      return roundedOutline(shape).map(([along, z]) => side === 'left-edge'
+        ? [-shortSidePlane, centerAlongEdge + along, centerZ + z]
+        : [centerAlongEdge + along, longSidePlane, centerZ + z]);
     }),
   ];
   const segments: Point3[] = outline.filter((_, index) => index % 9 === 0)

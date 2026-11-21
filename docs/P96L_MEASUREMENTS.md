@@ -39,3 +39,10 @@ rear flat face reaches X = 53.5 mm. The default tab inner face is X = 54.5 mm,
 with a ramped tip at X = 53.2 mm, behind the rear face. Four narrow bezel seats
 set the front contact plane. The effective click force and installation travel
 depend on the printed part and still require testing.
+
+The preview separates the left-edge dial outlines from their recessed surrounds.
+In app coordinates, the surrounds lie at X = −54.2 mm. Their Y spans are
+−19.55…−1.4 mm and 3.65…19.95 mm. The lower dial reaches X = −55.4 mm
+and the upper reaches about X = −54.52 mm. The top switch and button have
+separate outlines at their respective protrusion planes. These are procedural
+markers based on the STEP face bounds.
