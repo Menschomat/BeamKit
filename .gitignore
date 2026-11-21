@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.svelte-kit/
+coverage/
+playwright-report/
+test-results/
+*.local
+.DS_Store
+reference/
+generated_images/
+*.bundle
