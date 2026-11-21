@@ -56,8 +56,10 @@ test('3MF encodes one build object with three named, bed-aligned components', ()
   assert.match(model, /unit="millimeter"/);
   assert.match(model, /<build><item objectid="5"\/><\/build>/);
   assert.match(model, /<components><component objectid="2"\/><component objectid="3"\/><component objectid="4"\/><\/components>/);
-  for (const [i, title] of ['Honeycomb', 'Black perimeter liner', 'Outer shell and clips'].entries()) {
+  const palette = [['Honeycomb', '#202124'], ['Inner shell', '#858791'], ['Outer shell and clips', '#FF634A']];
+  for (const [i, [title, color]] of palette.entries()) {
     assert.ok(model.includes(`name="${title}" pid="1" pindex="${i}"`));
+    assert.ok(model.includes(`<base name="${title}" displaycolor="${color}"/>`));
   }
   const heights = Array.from(model.matchAll(/<vertex x="[^"]+" y="[^"]+" z="([^"]+)"/g), match => Number(match[1]));
   assert.equal(Math.min(...heights), 0);

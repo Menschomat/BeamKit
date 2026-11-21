@@ -6,8 +6,8 @@ millimetres. The front face is placed on the print bed for the current presets.
 An optional fit coupon is available under Advanced test tools.
 
 For an integrated honeycomb, open **Print → Multicolor printing** to preview
-and export one 3MF with three parts: the honeycomb, a 0.8 mm black perimeter
-liner, and the outer shell with clips. Import it as a single multipart model
+and export one 3MF with three parts: a black honeycomb, a 0.8 mm gray inner
+shell, and an orange outer shell with clips. Import it as a single multipart model
 and assign a filament to each part in the slicer. The preview colors identify
 the regions, while the slicer controls the real filaments and printer settings.
 

@@ -126,7 +126,7 @@ test('multicolor mode downloads a 3MF, survives reload, and can switch back to S
   await page.getByRole('checkbox', { name: 'Multicolor printing' }).check();
   const export3mf = page.getByRole('button', { name: 'Export 3MF', exact: true });
   await expect(export3mf).toBeEnabled();
-  await expect(page.getByText('Black perimeter liner', { exact: true })).toBeVisible();
+  await expect(page.getByText('Inner shell', { exact: true })).toBeVisible();
   const downloaded = page.waitForEvent('download');
   await export3mf.click();
   expect((await downloaded).suggestedFilename()).toBe('p96l-honeycomb-multicolor.3mf');
