@@ -15,12 +15,14 @@ export type OverhangReport = {
 };
 
 /** Rotate the front face onto the bed without reflecting the solid or changing scale. */
-export function orientFrontDown(mesh: GridMesh): GridMesh {
+export function orientFrontDown(mesh: GridMesh, sharedFrontZ?: number): GridMesh {
   if (mesh.positions.length === 0 || mesh.positions.length % 3 !== 0 || !mesh.positions.every(Number.isFinite)) {
     throw new Error('Print orientation requires finite three-dimensional vertices.');
   }
-  let frontZ = -Infinity;
-  for (let i = 2; i < mesh.positions.length; i += 3) frontZ = Math.max(frontZ, mesh.positions[i]);
+  let frontZ = sharedFrontZ ?? -Infinity;
+  if (sharedFrontZ === undefined) {
+    for (let i = 2; i < mesh.positions.length; i += 3) frontZ = Math.max(frontZ, mesh.positions[i]);
+  }
   const positions = new Float32Array(mesh.positions.length);
   for (let i = 0; i < positions.length; i += 3) {
     positions[i] = mesh.positions[i];

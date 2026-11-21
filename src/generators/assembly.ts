@@ -2,6 +2,7 @@ import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import { lamps, resolveDefinition } from '../catalog/registry.ts';
 import { printDiagnostics, validateDesign } from '../domain/project.ts';
 import type { Design } from '../domain/project.ts';
+import { materialRegions } from '../domain/materials.ts';
 import type { Bounds, Diagnostic, LampDefinition } from '../domain/definitions.ts';
 import { hexagons, roundedOutline } from '../geometry/profile.ts';
 import type { Aperture, GridSettings, Point } from '../geometry/profile.ts';
@@ -12,7 +13,8 @@ import type { GridMesh } from '../geometry/protocol.ts';
 import { generateHoneycomb } from './honeycomb.ts';
 
 export type PrintablePart = { name: string; mesh: GridMesh; bounds: Bounds; volumeMm3: number; transform: [number, number, number] };
-export type AssemblyResult = { parts: PrintablePart[]; diagnostics: Diagnostic[]; elapsedMs: number; projectRevision: number; provenance: Design['engine']; connection: null; printAnalysis?: OverhangReport };
+export type MaterialRegion = PrintablePart & { material: keyof typeof materialRegions };
+export type AssemblyResult = { parts: PrintablePart[]; regions?: MaterialRegion[]; diagnostics: Diagnostic[]; elapsedMs: number; projectRevision: number; provenance: Design['engine']; connection: null; printAnalysis?: OverhangReport };
 
 /** Join corresponding convex contours, including the horizontal sheet seat. */
 function loftOpening(kernel: ManifoldToplevel, rings: { outline: Point[]; z: number }[]) {
@@ -235,14 +237,39 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
         if (overlap.volume() > 1e-5) throw new Error(`Geometry blocks ${keepout.id}. Increase front clearance or use a compatible configuration.`);
       }
     }
+    const partitionSource = solid;
     if (dfam) solid = own(own(new Manifold(solid.getMesh())).setTolerance(0.0001));
     const checked = validateSolid(solid, scope);
     const printAnalysis = analyzeOverhangs(orientFrontDown(checked.mesh));
     if (dfam && project.attachment.id === 'honeycomb' && printAnalysis.steepOverhangAreaMm2 > 0.00001) throw new Error('This configuration exceeds the 45-degree front-down print limit. Adjust the frame, depth or fit settings.');
+    let regions: MaterialRegion[] | undefined;
+    if (project.export.format === '3mf' && project.mount) {
+      const { diffuserClearanceMm, supportThicknessMm } = project.mount.parameters;
+      const baseZ = diffuserClearanceMm + supportThicknessMm - 0.4;
+      const volumeAtOffset = (offset: number) => extrude(section({
+        width: aperture.width + 2 * offset,
+        height: aperture.height + 2 * offset,
+        radius: aperture.radius + offset,
+      }), p.depth + 0.1, baseZ);
+      // A 0.4 mm rim joins the grid walls. The next 0.8 mm is the liner.
+      // Cutting the same finished solid keeps the regions in contact without overlapping.
+      const gridBoundary = volumeAtOffset(0.4);
+      const linerBoundary = volumeAtOffset(1.2);
+      const grid = own(partitionSource.intersect(gridBoundary));
+      const insideLiner = own(partitionSource.intersect(linerBoundary));
+      const liner = own(insideLiner.subtract(gridBoundary));
+      const shell = own(partitionSource.subtract(linerBoundary));
+      const region = (material: MaterialRegion['material'], geometry: Manifold): MaterialRegion => ({
+        material, name: materialRegions[material].label,
+        ...validateSolid(own(own(new Manifold(geometry.getMesh())).setTolerance(0.0001)), scope, material),
+        transform: [0, 0, 0],
+      });
+      regions = [region('honeycomb', grid), region('liner', liner), region('shell', shell)];
+    }
     const diagnostics = printDiagnostics(project);
     if (printAnalysis.steepOverhangAreaMm2 > 0.00001) diagnostics.push({ level: 'warning', code: 'overhangs', message: 'This revision has downward-facing ledges. Inspect bridging and supports in your slicer; support-free printing is not verified.' });
     const name = project.assembly.mode === 'fit-test' ? `${prefix}-collar-fit-test` : `${prefix}-${project.attachment.id}`;
-    return { parts: [{ name, ...checked, transform: [0, 0, 0] }], diagnostics, elapsedMs: performance.now() - start, projectRevision, provenance: project.engine, connection: null, printAnalysis };
+    return { parts: [{ name, ...checked, transform: [0, 0, 0] }], regions, diagnostics, elapsedMs: performance.now() - start, projectRevision, provenance: project.engine, connection: null, printAnalysis };
   } finally { scope.dispose(); }
 }
 function meshVolume(mesh: GridMesh) {

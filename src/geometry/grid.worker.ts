@@ -8,7 +8,7 @@ self.onmessage = async ({ data }: MessageEvent<GenerationRequest>) => {
   try {
     const result = generateAssembly(await kernel, project, projectRevision);
     const response: GenerationResponse = { id, projectRevision, result };
-    const transfer = result.parts.flatMap(part => [part.mesh.positions.buffer, part.mesh.indices.buffer]);
+    const transfer = [...result.parts, ...(result.regions ?? [])].flatMap(part => [part.mesh.positions.buffer, part.mesh.indices.buffer]);
     self.postMessage(response, { transfer });
   } catch (error) {
     const response: GenerationResponse = { id, projectRevision, error: error instanceof Error ? error.message : String(error) };

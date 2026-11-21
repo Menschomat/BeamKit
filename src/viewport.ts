@@ -7,6 +7,7 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { lamps } from './catalog/registry.ts';
 import { lampReferenceLines } from './geometry/lamp-reference.ts';
+import { materialRegions } from './domain/materials.ts';
 import type { AssemblyResult } from './generators/assembly.ts';
 export type ViewOptions = { mode: 'assembly' | 'part' | 'section' | 'print'; lampVisible: boolean; keepoutsVisible: boolean; lampOpacity: number };
 export function createViewport(host: HTMLElement) {
@@ -81,6 +82,12 @@ export function createViewport(host: HTMLElement) {
   keepouts.visible = false; scene.add(keepouts);
   const partGroup = new Group(); scene.add(partGroup);
   const material = new MeshStandardMaterial({ color: '#62666b', roughness: 0.8, metalness: 0.01, flatShading: true });
+  const regionMaterials = {
+    honeycomb: new MeshStandardMaterial({ color: materialRegions.honeycomb.color, roughness: 0.8, flatShading: true }),
+    liner: new MeshStandardMaterial({ color: materialRegions.liner.color, roughness: 0.8, flatShading: true }),
+    shell: new MeshStandardMaterial({ color: materialRegions.shell.color, roughness: 0.8, flatShading: true }),
+  };
+  const printMaterials = [material, ...Object.values(regionMaterials)];
   const cutPlane = new Plane(new Vector3(0, -1, 0), 0);
   let displayed: AssemblyResult | null = null;
   const render = () => renderer.render(scene, camera);
@@ -126,23 +133,28 @@ export function createViewport(host: HTMLElement) {
       floor.position.z = options.mode === 'print' ? -0.05 : -16;
       const sectionActive = options.mode === 'section';
       if (sectionActive !== Boolean(material.clippingPlanes?.length)) {
-        material.clippingPlanes = sectionActive ? [cutPlane] : [];
-        material.needsUpdate = true;
+        for (const printMaterial of printMaterials) {
+          printMaterial.clippingPlanes = sectionActive ? [cutPlane] : [];
+          printMaterial.needsUpdate = true;
+        }
       }
       if (displayed !== result) {
         const firstGeometry = displayed === null && result !== null;
         clearParts(); displayed = result;
-        for (const part of result?.parts ?? []) {
+        for (const [index, part] of (result?.regions ?? result?.parts ?? []).entries()) {
           const geometry = new BufferGeometry(); geometry.setAttribute('position', new BufferAttribute(part.mesh.positions, 3));
           geometry.setIndex(new BufferAttribute(part.mesh.indices, 1)); geometry.computeVertexNormals();
-          const mesh = new Mesh(geometry, material); mesh.position.set(...part.transform); partGroup.add(mesh);
+          const region = result?.regions?.[index];
+          const mesh = new Mesh(geometry, region ? regionMaterials[region.material] : material);
+          mesh.position.set(...part.transform);
+          partGroup.add(mesh);
         }
         if (firstGeometry) fit();
       }
       render();
     },
     dispose() {
-      resize.disconnect(); controls.dispose(); clearParts(); material.dispose();
+      resize.disconnect(); controls.dispose(); clearParts(); printMaterials.forEach(printMaterial => printMaterial.dispose());
       const referenceGeometries = new Set(lamp.children.map(object => (object as Mesh | LineLoop | LineSegments).geometry));
       referenceGeometries.forEach(geometry => geometry.dispose());
       for (const material of [lines, apertureLine, housingTint, apertureTint, housingDepth]) material.dispose();

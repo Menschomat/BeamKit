@@ -186,7 +186,10 @@
       "properties": {
         "format": {
           "type": "string",
-          "const": "stl"
+          "enum": [
+            "stl",
+            "3mf"
+          ]
         },
         "quality": {
           "type": "string",

@@ -15,6 +15,13 @@ and tapered seat use more geometric volume than the original prototype holder.
 These checks measure mesh geometry. Slicer toolpaths and real print behavior
 remain to be checked. See [print tests](PRINT_TESTS.md).
 
+Multicolor mode partitions the same honeycomb solid into three closed regions
+with no bulk overlap. The [Core 3MF](https://3mf.io/spec/core-v1-3-0/) package
+uses millimetres and groups the regions under one build object. Bambu Studio
+2.9 and OrcaSlicer CLI tools loaded the default export as three manifold parts with dimensions
+113.8 × 63.8 × 28.5 mm and a minimum Z of 0. Filament assignment, actual sliced
+toolpaths and material compatibility remain hardware and slicer checks.
+
 | Plan milestone | Evidence and remaining gate |
 | --- | --- |
 | Geometry feasibility | Manifold 3.5.5 generates closed, connected solids with clear access volumes. The benchmark records assembly, STL and alternative subtraction timings. Node RSS grew across 600 builds. The browser recycles its worker after 32 successful builds to bound the lifetime of each WASM heap. Long-session browser memory and Bambu Studio import remain to be checked. |

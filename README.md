@@ -5,6 +5,12 @@ or diffusion sheet holder, adjust the geometry, and export one integrated STL in
 millimetres. The front face is placed on the print bed for the current presets.
 An optional fit coupon is available under Advanced test tools.
 
+For an integrated honeycomb, open **Print → Multicolor printing** to preview
+and export one 3MF with three parts: the honeycomb, a 0.8 mm black perimeter
+liner, and the outer shell with clips. Import it as a single multipart model
+and assign a filament to each part in the slicer. The preview colors identify
+the regions, while the slicer controls the real filaments and printer settings.
+
 ## Development
 
 Use Node 24 (see `.nvmrc`). Dependencies are pinned with `package-lock.json`; install with `npm ci`.

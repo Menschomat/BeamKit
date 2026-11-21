@@ -5,9 +5,11 @@
   import { registerSW } from 'virtual:pwa-register';
   import ParameterField from './app/ParameterField.svelte';
   import { attachments, connections, lamps, mounts, resolveDefinition } from './catalog/registry.ts';
-  import { attachmentDefinition, createDesign, decodeDesign, encodeDesign, printDiagnostics, validateDesign } from './domain/project.ts';
+  import { attachmentDefinition, createDesign, decodeDesign, encodeDesign, printDiagnostics, supportsMulticolor, validateDesign } from './domain/project.ts';
   import type { Design } from './domain/project.ts';
   import { orientFrontDown } from './geometry/printability.ts';
+  import { multicolor3mf } from './export-3mf.ts';
+  import { materialRegions } from './domain/materials.ts';
   import { exportBundle } from './export-bundle.ts';
   import { binaryStl, download } from './export.ts';
   import { licenseUrl } from './project.ts';
@@ -38,6 +40,8 @@
   const selectedLamp = $derived(resolveDefinition(lamps, project.lamp));
   const selectedMount = $derived(project.mount ? resolveDefinition(mounts, project.mount) : null);
   const definition = $derived(attachmentDefinition(project));
+  const multicolorAvailable = $derived(supportsMulticolor(project));
+  const multicolor = $derived(project.export.format === '3mf');
   const diagnostics = $derived(result && current ? result.diagnostics : printDiagnostics(project));
   const dimensions = $derived(result?.parts[0] ? result.parts[0].bounds.max.map((v, i) => v - result!.parts[0].bounds.min[i]) : null);
   const triangleCount = $derived(result?.parts.reduce((sum, part) => sum + part.mesh.indices.length / 3, 0) ?? 0);
@@ -72,11 +76,18 @@
       const mount = mounts.find(entry => selectedLamp.mounts.includes(entry.id))!;
       project.mount = { id: mount.id, revision: mount.revision, parameters: { ...mount.defaults } };
     }
+    if (!supportsMulticolor(project)) project.export.format = 'stl';
     project.name = `${selectedLamp.label} ${entry.label.toLowerCase()}`; rebuild();
   }
   function changeMode(mode: Design['assembly']['mode']) {
     remember(); project.assembly.mode = mode;
     if (mode !== 'standalone' && !project.mount) project.mount = createDesign().mount;
+    if (!supportsMulticolor(project)) project.export.format = 'stl';
+    rebuild();
+  }
+  function changeMulticolor(enabled: boolean) {
+    remember();
+    project.export.format = enabled && supportsMulticolor(project) ? '3mf' : 'stl';
     rebuild();
   }
   function history(direction: 'undo' | 'redo') {
@@ -111,6 +122,11 @@
   }
   function exportParts() {
     if (!current || !result || result.projectRevision !== revision) return;
+    if (multicolor) {
+      const model = multicolor3mf(result, project.export.orientation);
+      download(`${result.parts[0].name}-multicolor.3mf`, new Blob([model], { type: 'model/3mf' }));
+      return;
+    }
     for (const part of result.parts) download(`${part.name}.stl`, new Blob([binaryStl(project.export.orientation === 'front-down' ? orientFrontDown(part.mesh) : part.mesh)], { type: 'model/stl' }));
   }
   function saveBundle() {
@@ -183,7 +199,7 @@
       <input aria-label="Select project JSON" type="file" accept=".json,application/json" bind:this={fileInput} onchange={importProject} hidden />
       <button class="quiet" disabled={booting} onclick={() => fileInput.click()}>Import JSON</button><button class="quiet" disabled={booting} onclick={saveJson}>Save JSON</button>
       <button class="quiet bundle-action" disabled={!current} onclick={saveBundle}>Save bundle</button>
-      <button class="primary" disabled={!current} onclick={exportParts}><span aria-hidden="true">↓</span> Export STL</button>
+      <button class="primary" disabled={!current} onclick={exportParts}><span aria-hidden="true">↓</span> {multicolor ? 'Export 3MF' : 'Export STL'}</button>
     </div>
   </div>
   {#if installOpen}<div class="notice install-guide"><strong>Install BeamKit</strong><p>In Chrome, use the install icon in the address bar. On Safari, use Share → Add to Dock or Add to Home Screen. Open once online and wait for “Offline ready”. Browser storage can be cleared; keep JSON backups.</p><button onclick={() => installOpen = false}>Close guidance</button></div>{/if}
@@ -216,7 +232,20 @@
       <div class="settings-body">
         {#if settingsTab === 'attachment'}<div class="settings-intro"><h2>{definition.label}</h2><p>{definition.description}</p></div>{#each definition.fields as field}<ParameterField {field} value={project.attachment.parameters[field.key]} disabled={booting} prefix="attachment" onchange={value => changeParameter('attachment', field.key, value)} />{/each}
         {:else if settingsTab === 'mount'}<div class="settings-intro"><h2>Lamp fit</h2><p>Clearance is specified per side. Access envelopes always take priority.</p></div>{#if project.mount}{#each selectedMount?.fields ?? [] as field}<ParameterField {field} value={project.mount.parameters[field.key]} disabled={booting} prefix="mount" onchange={value => changeParameter('mount', field.key, value)} />{/each}{:else}<p class="field-help">Choose an integrated output to edit the lamp fit.</p>{/if}
-        {:else}<div class="settings-intro"><h2>Print profile</h2><p>Designed around a Bambu Lab printer with a 0.4 mm nozzle. Slice the STL in your preferred slicer.</p></div><dl class="print-specs"><div><dt>Nozzle diameter</dt><dd>0.4 mm</dd></div><div><dt>Default grid walls</dt><dd>0.8 mm · 2 nominal paths</dd></div><div><dt>STL scale</dt><dd>Millimetres</dd></div><div><dt>Print orientation</dt><dd>Front face on bed</dd></div><div><dt>Starting setup</dt><dd>0.20 mm layers · 4 walls</dd></div><div><dt>Infill</dt><dd>0–10% · inspect in slicer</dd></div></dl><label for="material" class="section-heading">Planned material</label><select id="material" value={project.printProfile.material} onchange={event => { remember(); project.printProfile.material = event.currentTarget.value as Design['printProfile']['material']; rebuild(); }}><option value="unspecified">Choose in slicer</option><option>PLA</option><option>PETG</option><option>ASA</option></select><p class="field-help">Material choice does not certify temperature resistance. Confirm walls, orientation, supports and fit in the slicer.</p>{/if}
+        {:else}<div class="settings-intro"><h2>Print profile</h2><p>Designed around a Bambu Lab printer with a 0.4 mm nozzle. Assign filaments and slice in your preferred slicer.</p></div>{#if multicolorAvailable}
+          <div class="multicolor-settings">
+            <label><input type="checkbox" checked={multicolor} disabled={booting} onchange={event => changeMulticolor(event.currentTarget.checked)} /> Multicolor printing</label>
+            {#if multicolor}
+              <ul class="material-key">
+                {#each Object.values(materialRegions) as region}
+                  <li><i style:background={region.color}></i>{region.label}</li>
+                {/each}
+              </ul>
+              <p class="field-help">The 0.8 mm liner runs around the grid. Import the 3MF as one object with three parts, then assign filaments in your slicer.</p>
+            {/if}
+          </div>
+        {/if}
+        <dl class="print-specs"><div><dt>Nozzle diameter</dt><dd>0.4 mm</dd></div><div><dt>Default grid walls</dt><dd>0.8 mm · 2 nominal paths</dd></div><div><dt>Model scale</dt><dd>Millimetres</dd></div><div><dt>Print orientation</dt><dd>Front face on bed</dd></div><div><dt>Starting setup</dt><dd>0.20 mm layers · 4 walls</dd></div><div><dt>Infill</dt><dd>0–10% · inspect in slicer</dd></div></dl><label for="material" class="section-heading">Planned material</label><select id="material" value={project.printProfile.material} onchange={event => { remember(); project.printProfile.material = event.currentTarget.value as Design['printProfile']['material']; rebuild(); }}><option value="unspecified">Choose in slicer</option><option>PLA</option><option>PETG</option><option>ASA</option></select><p class="field-help">Material choice does not certify temperature resistance. Confirm walls, orientation, supports and fit in the slicer.</p>{/if}
       </div>
       <details class="diagnostics" open><summary><span class="warning-dot"></span>Print notes <span>{diagnostics.length}</span></summary>{#each diagnostics as note}<p class:warning={note.level === 'warning'}>{note.message}</p>{/each}</details>
     </aside>

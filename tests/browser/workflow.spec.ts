@@ -119,3 +119,21 @@ test('an older autosave opens the current corner model without an upgrade banner
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
   await expect(page.getByRole('spinbutton', { name: 'Corner clip depth', exact: true })).toHaveValue('14.5');
 });
+
+test('multicolor mode downloads a 3MF, survives reload, and can switch back to STL', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Print', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Multicolor printing' }).check();
+  const export3mf = page.getByRole('button', { name: 'Export 3MF', exact: true });
+  await expect(export3mf).toBeEnabled();
+  await expect(page.getByText('Black perimeter liner', { exact: true })).toBeVisible();
+  const downloaded = page.waitForEvent('download');
+  await export3mf.click();
+  expect((await downloaded).suggestedFilename()).toBe('p96l-honeycomb-multicolor.3mf');
+  await expect(page.getByRole('status')).toContainText('Saved locally');
+  await page.reload();
+  await expect(export3mf).toBeEnabled();
+  await page.getByRole('button', { name: 'Print', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Multicolor printing' }).uncheck();
+  await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+});

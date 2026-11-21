@@ -7,11 +7,11 @@ export class SolidScope {
   own<T extends { delete(): void }>(value: T): T { this.objects.push(value); return value; }
   dispose() { for (const object of this.objects.reverse()) object.delete(); this.objects = []; }
 }
-export function validateSolid(solid: Manifold, scope: SolidScope): { mesh: GridMesh; bounds: Bounds; volumeMm3: number } {
+export function validateSolid(solid: Manifold, scope: SolidScope, name = 'Printable part'): { mesh: GridMesh; bounds: Bounds; volumeMm3: number } {
   const volumeMm3 = solid.volume();
   if (solid.status() !== 'NoError' || solid.isEmpty() || !Number.isFinite(volumeMm3) || volumeMm3 <= 0) throw new Error('Geometry did not produce a valid positive-volume solid.');
   const components = solid.decompose(); components.forEach(c => scope.own(c));
-  if (components.length !== 1) throw new Error('Each printable part must be one connected solid.');
+  if (components.length !== 1) throw new Error(`${name} must be one connected solid.`);
   const data = solid.getMesh();
   const positions = new Float32Array(data.numVert * 3);
   for (let i = 0; i < data.numVert; i++) positions.set(data.vertProperties.subarray(i * data.numProp, i * data.numProp + 3), i * 3);
