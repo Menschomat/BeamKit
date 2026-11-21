@@ -47,8 +47,15 @@ and the upper reaches about X = −54.52 mm. The top switch and button have
 separate outlines at their respective protrusion planes. These are procedural
 markers based on the STEP face bounds.
 
-The current mount instead uses the existing right corners. The hook strips
+The previous mount used only the two right corners. The hook strips
 start at Y = ±22.5 mm, near the straight corner contact faces (STEP faces 93
 and 94), and extend 3 mm toward the corners. A sloped hook clears the modeled
 rear roll-off before reaching inside the rear shoulder. The middle 45 mm of
 the right edge remains open. Flex and retention need a printed fit test.
+
+The current design uses all four existing brackets. The hook strips start at
+|Y| = 24.05 mm, just outside the modeled left dial access envelope, and extend
+1.8 mm toward the corner. The default bracket depth is 14.5 mm, down from
+16.5 mm, with a shorter insertion ramp and unchanged hook reach. The reference
+rear face reaches approximately X = ±53.5 mm around Y = ±24.5 mm, where the
+default hooks provide overlap. Check snap force and release on the fit coupon.

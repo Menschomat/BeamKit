@@ -3,13 +3,13 @@
 The local editor supports two integrated P96L accessories, the honeycomb and
 diffusion sheet holder. Its default STL is one connected solid in millimetres,
 oriented front-face down. The optional fit coupon lives under Advanced test tools.
-The latest mount revision places two hooks in the existing right corners and leaves the center of that edge open.
+The latest mount places four compact hooks in the existing corners and leaves both short edges open between them.
 It includes four front seats and access cutouts based on the reference dimensions.
 Earlier project revisions remain supported, with an explicit upgrade action.
 
-The default honeycomb is 113.8 × 63.8 × 30.5 mm and uses 27,156 mm³ of solid
-geometry, about 3.6% less than the initial 28,178 mm³ integrated design. The two
-presets have a maximum downward slope of below 45° from vertical outside bed
+The default honeycomb is 113.8 × 63.8 × 28.5 mm and uses 26,946 mm³ of solid
+geometry, about 4.4% less than the initial 28,178 mm³ integrated design. The two
+presets have a maximum downward slope below 45° from vertical outside bed
 contact, with zero triangles flagged above 45°. The holder’s deeper sheet pocket
 and tapered seat use more geometric volume than the original prototype holder.
 These checks measure mesh geometry. Slicer toolpaths and real print behavior

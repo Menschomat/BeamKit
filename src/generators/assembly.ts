@@ -163,6 +163,7 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
         }
       }
       if (project.mount.revision >= 4) {
+        const allCorners = project.mount.revision >= 5;
         const sideX = cavity.width / 2;
         const straightEdgeEnd = lamp.body.height / 2 - lamp.body.radius;
         const gapEnd = straightEdgeEnd - 1.5;
@@ -182,14 +183,21 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
         const rolledEdgeX = rearEdgeX + Math.hypot(rearInset, slope * rearRollMm) - slope * rearRollMm;
         const peakZ = -lamp.body.depth - Math.max(0.5, (rolledEdgeX + 0.1 - hookX) / slope);
         const cornerShell = extrude(section(outerShape), m.engagementMm + m.diffuserClearanceMm, -m.engagementMm);
+        // Shorten the rear lead-in on the compact clip. The print-facing slope stays below 45°.
+        const hookBack = allCorners ? Math.max(-m.engagementMm, peakZ - rampLength) : peakZ - rampLength;
         const hookProfile = own(new CrossSection([[
-          [sideX, peakZ - rampLength], [outerShape.width / 2, peakZ - rampLength],
+          [sideX, hookBack], [outerShape.width / 2, hookBack],
           [outerShape.width / 2, peakZ + rampLength], [sideX, peakZ + rampLength], [hookX, peakZ],
         ]]));
-        const hookStrip = own(own(hookProfile.extrude(3)).rotate([90, 0, 0]));
-        for (const endY of [-gapEnd, gapEnd + 3]) {
+        // Keep the left hooks beyond the dial envelope and use matching placements on the right.
+        const dialEnvelope = lamp.keepouts.find(keepout => keepout.id === 'dial-finger-access');
+        const startY = allCorners ? Math.max(straightEdgeEnd, dialEnvelope?.bounds.max[1] ?? 0) + 0.05 : gapEnd;
+        const hookWidth = allCorners ? 1.8 : 3;
+        const hookStrip = own(own(hookProfile.extrude(hookWidth)).rotate([90, 0, 0]));
+        for (const endY of [-startY, startY + hookWidth]) {
           const hook = own(own(hookStrip.translate([0, endY, 0])).intersect(cornerShell));
           collar = own(collar.add(hook));
+          if (allCorners) collar = own(collar.add(own(hook.rotate([0, 0, 180]))));
         }
       }
       if (project.mount.revision >= 3) {

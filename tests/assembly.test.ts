@@ -101,21 +101,23 @@ test('print-optimized honeycomb preserves the footprint and eliminates steep loc
   }
 });
 
-test('corner hooks leave the center of the right edge open and catch the modeled rear shoulder', () => {
+test('four corner hooks catch the modeled shoulder and leave the short edges open', () => {
   const { mesh } = generateAssembly(kernel, createDesign()).parts[0];
   const solid = new kernel.Manifold(new kernel.Mesh({
     numProp: 3, vertProperties: mesh.positions, triVerts: mesh.indices,
   }));
   try {
-    for (const y of [-22, -8, 0, 8, 22]) {
-      for (const z of [-8, -12.8]) assert.equal(solid.rayCast([60, y, z], [52, y, z]).length, 0);
-    }
-    for (const y of [-23, 23]) {
-      const hits = solid.rayCast([60, y, -12.8], [52, y, -12.8]);
-      assert.equal(hits.length, 2);
-      assert.ok(hits[1].position[0] < 53.5, 'Hook overlaps the reference rear shoulder');
-      const housingHeightHits = solid.rayCast([60, y, -8], [52, y, -8]);
-      assert.ok(Math.abs(housingHeightHits[1].position[0] - 55.3) < 0.001);
+    for (const side of [-1, 1]) {
+      for (const y of [-22, -8, 0, 8, 22]) {
+        for (const z of [-8, -12.8]) assert.equal(solid.rayCast([side * 60, y, z], [side * 52, y, z]).length, 0);
+      }
+      for (const y of [-24.5, 24.5]) {
+        const hits = solid.rayCast([side * 60, y, -12.8], [side * 52, y, -12.8]);
+        assert.equal(hits.length, 2);
+        assert.ok(Math.abs(hits[1].position[0]) < 53.5, 'Hook overlaps the reference rear shoulder');
+        const wall = solid.rayCast([side * 60, y, -8], [side * 52, y, -8]);
+        assert.ok(Math.abs(wall[1].position[0]) > 55.2);
+      }
     }
   } finally { solid.delete(); }
 });
@@ -128,7 +130,7 @@ test('upgrading the earlier tab mount preserves current attachment settings and 
   old.attachment.parameters.depth = 10;
   assert.equal(generateAssembly(kernel, old).parts.length, 1);
   const upgraded = upgradePrintDesign(old);
-  assert.equal(upgraded.mount!.revision, 4);
+  assert.equal(upgraded.mount!.revision, 5);
   assert.equal(upgraded.assembly.mode, 'fit-test');
   assert.deepEqual(upgraded.attachment, old.attachment);
 });

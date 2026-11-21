@@ -4,15 +4,15 @@ import { gridFields } from '../geometry/profile.ts';
 
 export const mountFields: readonly Field[] = [
   { key: 'fitClearancePerSideMm', label: 'Fit clearance per side', min: 0.15, max: 1, step: 0.05, unit: 'mm', help: 'Gap on each side of the lamp housing. Start with the fit test.' },
-  { key: 'engagementMm', label: 'Corner clip depth', min: 16.5, max: 19, step: 0.5, unit: 'mm' },
+  { key: 'engagementMm', label: 'Corner clip depth', min: 14.5, max: 19, step: 0.5, unit: 'mm' },
   { key: 'supportThicknessMm', label: 'Support thickness', min: 1.6, max: 3.2, step: 0.4, unit: 'mm' },
   { key: 'diffuserClearanceMm', label: 'Front clearance', min: 0.4, max: 2, step: 0.2, unit: 'mm' },
   { key: 'retainingLipMm', label: 'Hook reach', min: 1.8, max: 2.6, step: 0.1, unit: 'mm', help: 'Sets how far the spring hooks reach behind the lamp. Retention needs print testing.' },
   { key: 'accessCutoutWidthMm', label: 'Control access width', min: 60, max: 85, step: 1, unit: 'mm', help: 'Open access on both long sides. Positions are provisional.' },
 ];
 export const mounts: readonly MountDefinition[] = [{
-  id: 'smallrig.p96l.collar', revision: 4, label: 'Corner click mount · prototype', fields: mountFields,
-  defaults: { fitClearancePerSideMm: 0.3, engagementMm: 16.5, supportThicknessMm: 1.6,
+  id: 'smallrig.p96l.collar', revision: 5, label: 'Four corner clips · prototype', fields: mountFields,
+  defaults: { fitClearancePerSideMm: 0.3, engagementMm: 14.5, supportThicknessMm: 1.6,
     diffuserClearanceMm: 0.8, retainingLipMm: 2.1, accessCutoutWidthMm: 85 },
   supportedApertures: ['rounded-rectangle'],
 }];
@@ -62,6 +62,10 @@ export function resolveDefinition<T extends { id: string; revision: number }>(en
 
 // Historical revisions remain reproducible; they are not choices for new designs.
 export const historicalMounts: readonly MountDefinition[] = [{
+  ...mounts[0], revision: 4, label: 'Right corner clips · prototype',
+  fields: mountFields.map(field => field.key === 'engagementMm' ? { ...field, min: 16.5 } : field),
+  defaults: { ...mounts[0].defaults, engagementMm: 16.5 },
+}, {
   ...mounts[0], revision: 3, label: 'Two-tab click mount · prototype',
   fields: mountFields.map(field => field.key === 'engagementMm'
     ? { ...field, label: 'Spring tab length', min: 14, max: 18 }
