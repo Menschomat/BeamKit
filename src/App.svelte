@@ -229,7 +229,7 @@
   $effect.pre(() => {
     const root = document.documentElement;
     root.dataset.theme = theme;
-    const surface = getComputedStyle(root).getPropertyValue('--color-surface').trim();
+    const surface = getComputedStyle(root).getPropertyValue('--header-surface').trim();
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', surface);
   });
   $effect(() => {

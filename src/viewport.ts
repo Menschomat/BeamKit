@@ -26,17 +26,17 @@ export function createViewport(host: HTMLElement) {
   scene.background = background;
   const camera = new PerspectiveCamera(34, 1, 0.1, 2000); camera.up.set(0, 0, 1);
   const controls = new OrbitControls(camera, renderer.domElement); controls.maxDistance = 600; controls.minDistance = 35;
-  const floor = new GridHelper(350, 35, '#c9c9cd', '#dfdfe3'); floor.rotation.x = Math.PI / 2; floor.position.z = -16;
-  scene.add(floor, new AmbientLight(0xffffff, 2.1));
-  const light = new DirectionalLight(0xffffff, 3.2); light.position.set(-40, -90, 180); scene.add(light);
-  const rim = new DirectionalLight(0xffffff, 1.2); rim.position.set(60, 40, 30); scene.add(rim);
+  const floor = new GridHelper(350, 35, '#d5d5d5', '#f4f4f4'); floor.rotation.x = Math.PI / 2; floor.position.z = -16;
+  scene.add(floor, new AmbientLight(0xffffff, 1.55));
+  const light = new DirectionalLight(0xffffff, 1.85); light.position.set(-40, -90, 180); scene.add(light);
+  const rim = new DirectionalLight(0xffffff, 0.6); rim.position.set(60, 40, 30); scene.add(rim);
   const lamp = new Group();
   const profile = lamps[0];
   const reference = lampReferenceLines(profile);
-  const lines = new LineBasicMaterial({ color: '#535660', transparent: true, depthWrite: false });
-  const apertureLine = new LineBasicMaterial({ color: '#a94635', transparent: true, depthWrite: false });
-  const housingTint = new MeshBasicMaterial({ color: '#858791', transparent: true, depthWrite: false });
-  const apertureTint = new MeshBasicMaterial({ color: '#ff634a', transparent: true, depthWrite: false });
+  const lines = new LineBasicMaterial({ transparent: true, depthWrite: false });
+  const apertureLine = new LineBasicMaterial({ transparent: true, depthWrite: false });
+  const housingTint = new MeshBasicMaterial({ transparent: true, depthWrite: false });
+  const apertureTint = new MeshBasicMaterial({ transparent: true, depthWrite: false });
   const litAperture = new MeshBasicMaterial({ color: new Color('#fff2db').multiplyScalar(2.6), toneMapped: false });
   const housingDepth = new MeshBasicMaterial({
     transparent: true, colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
@@ -98,7 +98,7 @@ export function createViewport(host: HTMLElement) {
   uprights.renderOrder = 2;
   lamp.add(uprights);
   scene.add(lamp);
-  const keepouts = new Group(); const keepoutMaterial = new LineBasicMaterial({ color: '#c04c39', transparent: true, opacity: 0.65 });
+  const keepouts = new Group(); const keepoutMaterial = new LineBasicMaterial({ transparent: true, opacity: 0.65 });
   for (const { bounds } of lamps[0].keepouts) {
     const dimensions = bounds.max.map((v, i) => v - bounds.min[i]);
     const cube = new BoxGeometry(...dimensions as [number, number, number]);
@@ -107,7 +107,7 @@ export function createViewport(host: HTMLElement) {
   }
   keepouts.visible = false; scene.add(keepouts);
   const partGroup = new Group(); scene.add(partGroup);
-  const material = new MeshStandardMaterial({ color: '#62666b', roughness: 0.8, metalness: 0.01, flatShading: true });
+  const material = new MeshStandardMaterial({ color: '#6c8494', roughness: 0.8, metalness: 0.01, flatShading: true });
   const regionMaterials = {
     honeycomb: new MeshStandardMaterial({ color: materialRegions.honeycomb.color, roughness: 0.8, flatShading: true }),
     liner: new MeshStandardMaterial({ color: materialRegions.liner.color, roughness: 0.8, flatShading: true }),
@@ -158,14 +158,16 @@ export function createViewport(host: HTMLElement) {
     fit,
     update(result: AssemblyResult | null, options: ViewOptions, theme: 'light' | 'dark') {
       if (theme !== displayedTheme) {
-        const dark = theme === 'dark';
         displayedTheme = theme;
-        background.set(getComputedStyle(host).getPropertyValue('--color-canvas').trim());
-        floor.material.color.set(dark ? '#454750' : '#ffffff');
-        lines.color.set(dark ? '#c4c7d0' : '#535660');
-        apertureLine.color.set(dark ? '#ff8e79' : '#a94635');
-        housingTint.color.set(dark ? '#a1a4ad' : '#858791');
-        keepoutMaterial.color.set(dark ? '#ff8e79' : '#c04c39');
+        const style = getComputedStyle(host);
+        const color = (property: string) => style.getPropertyValue(property).trim();
+        background.set(color('--color-canvas'));
+        floor.material.color.set(color('--preview-grid'));
+        lines.color.set(color('--preview-outline'));
+        housingTint.color.set(color('--preview-housing'));
+        apertureLine.color.set(color('--preview-highlight'));
+        apertureTint.color.set(color('--color-accent'));
+        keepoutMaterial.color.copy(apertureLine.color);
       }
       lamp.visible = options.lampVisible && options.mode === 'assembly';
       lampOn = lamp.visible && options.lampOn;

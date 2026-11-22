@@ -1,12 +1,12 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-canvas: #ececef;
-  --color-surface: #fafafb;
-  --color-line: #d9dade;
-  --color-accent: #ff634a;
-  --color-ink: #25272c;
-  --color-muted: #62646b;
+  --color-canvas: #e1e7ea;
+  --color-surface: #f3f5f5;
+  --color-line: #b8bfc1;
+  --color-accent: #f3e308;
+  --color-ink: #2c4c5c;
+  --color-muted: #486373;
 }
 
 :root {
@@ -15,35 +15,47 @@
   color: var(--color-ink);
   background: var(--color-surface);
   font-synthesis: none;
-  --field-surface: #fff;
-  --hover-surface: #eaeaec;
-  --control-track: #bcbec6;
-  --accent-ink: #b94431;
-  --focus-color: #9d3b2c;
-  --notice-surface: #f2f2f5;
-  --error-surface: #fff1ee;
-  --error-ink: #8d3529;
-  --ready-color: #427654;
+  --header-surface: #2c4c5c;
+  --header-ink: #f3f5f5;
+  --header-hover: #3b5a6a;
+  --action-ink: #2c4c5c;
+  --action-hover: #ffef3a;
+  --field-surface: #fcfdfd;
+  --hover-surface: #e6ecee;
+  --control-track: #6c8494;
+  --accent-ink: #2c4c5c;
+  --focus-color: #2c4c5c;
+  --notice-surface: #e6ecee;
+  --error-surface: #f7eded;
+  --error-ink: #8c363b;
+  --ready-color: #406d56;
+  --preview-grid: #bdcbd2;
+  --preview-outline: #2c4c5c;
+  --preview-housing: #6c8494;
+  --preview-highlight: #716500;
   --control-radius: 6px;
   --gutter: 24px;
   --control-height: 44px;
 }
 :root[data-theme=dark] {
   color-scheme: dark;
-  --color-canvas: #202228;
-  --color-surface: #191b20;
-  --color-line: #383b44;
-  --color-ink: #ededef;
-  --color-muted: #adb0b9;
-  --field-surface: #252830;
-  --hover-surface: #30333c;
-  --control-track: #5b606c;
-  --accent-ink: #ff8e79;
-  --focus-color: #ff9a87;
-  --notice-surface: #24272e;
-  --error-surface: #392522;
-  --error-ink: #ffad9f;
+  --color-canvas: #1b303b;
+  --color-surface: #172a34;
+  --color-line: #405a69;
+  --color-ink: #edf2f3;
+  --color-muted: #b8bfc1;
+  --field-surface: #223a47;
+  --hover-surface: #2c4c5c;
+  --accent-ink: #f3e308;
+  --focus-color: #f3e308;
+  --notice-surface: #223a47;
+  --error-surface: #3a292e;
+  --error-ink: #ffb4b4;
   --ready-color: #80c496;
+  --preview-grid: #405a69;
+  --preview-outline: #b8bfc1;
+  --preview-housing: #b8bfc1;
+  --preview-highlight: #f3e308;
 }
 
 button, input, select { font: inherit; }
@@ -62,8 +74,8 @@ button {
 button:hover:not(:disabled) { background: var(--hover-surface); border-color: var(--control-track); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 button.quiet { border-color: transparent; background: transparent; }
-button.primary { background: var(--color-accent); border-color: var(--color-accent); color: #25272c; }
-button.primary:hover:not(:disabled) { background: #f15137; border-color: #f15137; }
+button.primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--action-ink); }
+button.primary:hover:not(:disabled) { background: var(--action-hover); border-color: var(--action-hover); }
 :where(button, a, input, select, summary):focus-visible {
   outline: 2px solid var(--focus-color);
   outline-offset: 2px;
@@ -74,7 +86,7 @@ select, input:not([type=range], [type=checkbox], [type=file]) {
   min-width: 0;
   width: 100%;
   min-height: var(--control-height);
-  border: 1px solid var(--color-line);
+  border: 1px solid var(--control-track);
   border-radius: var(--control-radius);
   padding: 8px 10px;
   color: var(--color-ink);
@@ -112,20 +124,24 @@ details[open] > summary::after { content: '−' / ''; }
 
 .app-shell { display: flex; flex-direction: column; min-height: 100dvh; }
 .app-header {
+  --focus-color: var(--color-accent);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 64px;
   padding: 8px var(--gutter);
-  border-bottom: 1px solid var(--color-line);
+  background: var(--header-surface);
+  color: var(--header-ink);
 }
 .brand, .header-actions { display: flex; align-items: center; gap: 8px; }
 .brand { min-height: var(--control-height); font-size: 21px; letter-spacing: -.04em; }
 .brand:hover { text-decoration: none; }
-.brand-mark { color: var(--accent-ink); font-size: 25px; font-weight: 750; letter-spacing: -.12em; }
+.brand-mark { color: var(--color-accent); font-size: 25px; font-weight: 750; letter-spacing: -.12em; }
 .brand-mark span { margin-left: 1px; vertical-align: top; font-size: 14px; }
 .header-actions button { white-space: nowrap; }
+.header-actions .quiet { color: inherit; }
+.header-actions .quiet:hover:not(:disabled) { background: var(--header-hover); border-color: transparent; }
 
 .workspace {
   display: grid;
@@ -174,7 +190,7 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
   border: 1px solid var(--color-line);
   border-radius: 8px;
   background: var(--color-surface);
-  box-shadow: 0 8px 24px #25272c24;
+  box-shadow: 0 8px 24px #152d3a24;
 }
 .camera-actions { display: flex; gap: 8px; }
 .camera-actions button { flex: 1; }
@@ -238,7 +254,7 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
   display: flex;
   align-items: center;
   flex: 0 0 98px;
-  border: 1px solid var(--color-line);
+  border: 1px solid var(--control-track);
   border-radius: var(--control-radius);
   background: var(--field-surface);
 }
@@ -275,7 +291,7 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
   color: var(--color-muted);
   font-size: 13px;
 }
-.status-bar i { display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: #757781; vertical-align: 2px; }
+.status-bar i { display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--control-track); vertical-align: 2px; }
 .status-bar i.ready { background: var(--ready-color); }
 .status-bar a { display: flex; align-items: center; min-height: 36px; }
 .notice {
@@ -303,7 +319,7 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
   overflow-y: auto;
   overflow-wrap: anywhere;
 }
-.editor-dialog::backdrop { background: #10111580; }
+.editor-dialog::backdrop { background: #10242f80; }
 .editor-dialog h2 { font-size: 22px; font-weight: 650; letter-spacing: -.025em; }
 .dialog-header, .project-name-row, .saved-project, .dialog-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .dialog-header { margin-bottom: 12px; }

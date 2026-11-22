@@ -29,12 +29,17 @@ test('theme follows the system until overridden and remembers the choice', async
   const root = page.locator('html');
   const project = page.getByRole('button', { name: 'Project', exact: true });
   const theme = page.getByLabel('Theme', { exact: true });
+  const canvas = page.getByRole('region', { name: 'Accessory preview' });
   await expect(root).toHaveCSS('color-scheme', 'dark');
-  await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+  await expect(canvas).toHaveCSS('background-color', 'rgb(27, 48, 59)');
+  const exportStl = page.getByRole('button', { name: 'Export STL', exact: true });
+  await expect(exportStl).toBeEnabled();
+  await expect(exportStl).toHaveCSS('background-color', 'rgb(243, 227, 8)');
   await project.click();
   await expect(theme).toHaveValue('system');
   await page.emulateMedia({ colorScheme: 'light' });
   await expect(root).toHaveCSS('color-scheme', 'light');
+  await expect(canvas).toHaveCSS('background-color', 'rgb(225, 231, 234)');
 
   await theme.selectOption('dark');
   await expect(root).toHaveCSS('color-scheme', 'dark');

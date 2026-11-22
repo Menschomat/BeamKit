@@ -9,15 +9,15 @@ import type { Aperture } from './geometry/profile.ts';
 
 export function createPanelLighting(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, aperture: Aperture) {
   RectAreaLightUniformsLib.init();
-  const light = new RectAreaLight('#fff4df', 2.5, aperture.width, aperture.height);
+  const light = new RectAreaLight('#fff4df', 1.55, aperture.width, aperture.height);
   light.position.z = 0.02;
   light.lookAt(0, 0, 1);
   light.visible = false;
   scene.add(light);
 
-  // Bloom needs a render target that can preserve brightness above display white.
+  // Preserve the diffuser's HDR output and keep the threshold above the lit polymer surfaces.
   const composer = renderer.extensions.has('EXT_color_buffer_float') ? new EffectComposer(renderer) : null;
-  const bloom = composer ? new UnrealBloomPass(renderer.getSize(new Vector2()), 0.25, 0.45, 1) : null;
+  const bloom = composer ? new UnrealBloomPass(renderer.getSize(new Vector2()), 0.25, 0.45, 1.65) : null;
   const output = composer ? new OutputPass() : null;
   if (composer && bloom && output) {
     composer.setPixelRatio(Math.min(renderer.getPixelRatio(), 1.5));
