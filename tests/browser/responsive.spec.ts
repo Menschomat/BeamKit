@@ -13,30 +13,35 @@ for (const width of [320, 390, 640, 768, 900, 1024, 1440]) {
     const bounds = await view.boundingBox();
     expect(bounds!.width).toBeGreaterThan(250);
     expect(bounds!.height).toBeGreaterThanOrEqual(200);
+    const viewOptions = page.getByText('View options', { exact: true });
+    const toggle = (await viewOptions.boundingBox())!;
+    expect(bounds!.x + bounds!.width - (toggle.x + toggle.width)).toBeGreaterThan(0);
+    const bottomGap = bounds!.y + bounds!.height - (toggle.y + toggle.height);
+    expect(bottomGap).toBeGreaterThan(0);
+    expect(bottomGap).toBeLessThanOrEqual(16);
+    await viewOptions.click();
+    const menu = (await page.locator('.view-options').boundingBox())!;
+    expect(menu.x).toBeGreaterThanOrEqual(bounds!.x);
+    expect(menu.y).toBeGreaterThanOrEqual(bounds!.y);
+    expect(menu.y + menu.height).toBeLessThan(toggle.y);
+    await viewOptions.click();
+
+    await expect(page.getByRole('button', { name: 'Parameters', exact: true })).toHaveCount(0);
+    const panel = page.getByRole('complementary', { name: 'Parameters' });
+    await expect(panel).toBeVisible();
+    const orientation = panel.getByRole('spinbutton', { name: 'Cell orientation', exact: true });
     if (width <= 1000) {
-      const parameters = page.getByRole('button', { name: 'Parameters', exact: true });
-      await expect(parameters).toBeVisible();
-      await expect(page.locator('.settings-panel')).toBeHidden();
-      await parameters.click();
-      const panel = page.locator('.settings-panel');
-      await expect(panel).toBeVisible();
       expect(await panel.evaluate(element => element.clientHeight)).toBeLessThanOrEqual(450);
       // The last parameter remains reachable inside the panel's own scroll area.
-      const orientation = panel.getByRole('spinbutton', { name: 'Cell orientation', exact: true });
       await orientation.scrollIntoViewIfNeeded();
       await expect(orientation).toBeVisible();
       await orientation.fill('30');
       await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
-      await parameters.click();
-      await expect(panel).toBeHidden();
       await stage.scrollIntoViewIfNeeded();
       await page.getByRole('button', { name: 'Print pose', exact: true }).click();
       await expect(page.getByRole('button', { name: 'Print pose', exact: true })).toHaveAttribute('aria-pressed', 'true');
     } else {
-      await expect(page.getByRole('button', { name: 'Parameters', exact: true })).toBeHidden();
-      const panel = page.locator('.settings-panel');
       expect(await panel.locator('.settings-scroll').evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
-      const orientation = panel.getByRole('spinbutton', { name: 'Cell orientation', exact: true });
       await orientation.scrollIntoViewIfNeeded();
       await expect(orientation).toBeVisible();
       const canvasBounds = await page.locator('.viewport canvas').boundingBox();
@@ -64,7 +69,6 @@ for (const width of [390, 1024]) {
     await page.setViewportSize({ width, height: 650 });
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
-    if (width === 390) await page.getByRole('button', { name: 'Parameters', exact: true }).click();
     const panel = page.getByRole('complementary', { name: 'Parameters' });
     await panel.scrollIntoViewIfNeeded();
 
@@ -85,17 +89,16 @@ for (const width of [390, 1024]) {
   });
 }
 
-test('resizing an open panel does not trap it or stretch the renderer', async ({ page }) => {
+test('resizing keeps the settings visible and the preview bounded', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Parameters', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'Parameters' });
+  await expect(panel).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(page.locator('.settings-panel')).toBeVisible();
+  await expect(panel).toBeVisible();
   await page.setViewportSize({ width: 768, height: 900 });
-  await expect(page.locator('.settings-panel')).toBeVisible();
-  await page.getByRole('button', { name: 'Parameters', exact: true }).click();
-  await expect(page.locator('.settings-panel')).toBeHidden();
+  await expect(panel).toBeVisible();
   const canvas = await page.locator('.viewport canvas').boundingBox();
   expect(canvas!.height).toBeLessThanOrEqual(480);
 });

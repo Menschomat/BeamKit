@@ -45,7 +45,6 @@
   let undoStack = $state<string[]>([]), redoStack = $state<string[]>([]);
   let settingsTab = $state<'attachment' | 'mount' | 'print'>('attachment');
   let view = $state<ViewOptions>({ mode: 'assembly', lampVisible: true, lampOn: true, keepoutsVisible: false, lampOpacity: 0.65 });
-  let showSettings = $state(false);
   let host: HTMLDivElement, fileInput: HTMLInputElement;
   let importDialog = $state<HTMLDialogElement>();
   let projectDialog = $state<HTMLDialogElement>();
@@ -265,35 +264,34 @@
             <p class="dimensions" aria-label="Model dimensions">{dimensions.map(value => value.toFixed(1)).join(' × ')} mm</p>
           {/if}
         </div>
-        <button class="settings-toggle" aria-expanded={showSettings} aria-controls="parameters" onclick={() => showSettings = !showSettings}>Parameters</button>
       </div>
-      <div class="viewport" bind:this={host}></div>
+      <div class="preview-area">
+        <div class="viewport" bind:this={host}></div>
+        <details class="view-menu">
+          <summary>View options</summary>
+          <div class="view-options">
+            <div class="camera-actions">
+              <button class="quiet" onclick={() => viewport?.fit(true)}>Front view</button>
+              <button class="quiet" onclick={() => viewport?.fit()}>Fit view</button>
+            </div>
+            <label><input type="checkbox" bind:checked={view.lampVisible} /> Lamp reference</label>
+            <label class="lamp-power"><input type="checkbox" bind:checked={view.lampOn} disabled={view.mode !== 'assembly' || !view.lampVisible} /> Lamp on</label>
+            <label><input type="checkbox" bind:checked={view.keepoutsVisible} /> Access volumes</label>
+            <label class="opacity-control">Lamp opacity<input aria-label="Lamp reference opacity" type="range" min="0.1" max="0.8" step="0.05" bind:value={view.lampOpacity} /></label>
+          </div>
+        </details>
+      </div>
       {#if !current && result}<span class="stale-badge">Updating preview…</span>{/if}
       {#if previewError}<p class="preview-error">{previewError}</p>{/if}
       <div class="preview-controls">
-        <div class="view-toolbar">
-          <div class="segmented" role="group" aria-label="Preview view">
-            {#each previewViews as { mode, label }}
-              <button aria-pressed={view.mode === mode} onclick={() => view.mode = mode}>{label}</button>
-            {/each}
-          </div>
-          <details class="view-menu">
-            <summary>View options</summary>
-            <div class="view-options">
-              <div class="camera-actions">
-                <button class="quiet" onclick={() => viewport?.fit(true)}>Front view</button>
-                <button class="quiet" onclick={() => viewport?.fit()}>Fit view</button>
-              </div>
-              <label><input type="checkbox" bind:checked={view.lampVisible} /> Lamp reference</label>
-              <label class="lamp-power"><input type="checkbox" bind:checked={view.lampOn} disabled={view.mode !== 'assembly' || !view.lampVisible} /> Lamp on</label>
-              <label><input type="checkbox" bind:checked={view.keepoutsVisible} /> Access volumes</label>
-              <label class="opacity-control">Lamp opacity<input aria-label="Lamp reference opacity" type="range" min="0.1" max="0.8" step="0.05" bind:value={view.lampOpacity} /></label>
-            </div>
-          </details>
+        <div class="segmented" role="group" aria-label="Preview view">
+          {#each previewViews as { mode, label }}
+            <button aria-pressed={view.mode === mode} onclick={() => view.mode = mode}>{label}</button>
+          {/each}
         </div>
       </div>
     </section>
-    <aside id="parameters" aria-label="Parameters" class:mobile-open={showSettings} class="settings-panel">
+    <aside aria-label="Parameters" class="settings-panel">
       <div class="settings-tabs" role="group" aria-label="Parameter groups">
         {#each settingsTabs as { id, label }}
           <button aria-pressed={settingsTab === id} onclick={() => settingsTab = id}>{label}</button>

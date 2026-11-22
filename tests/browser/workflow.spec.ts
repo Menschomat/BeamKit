@@ -127,8 +127,6 @@ test('local projects, invalid dimensions, latest revision, and mobile panels', a
   await page.getByRole('button', { name: 'Fit trial', exact: true }).click();
   await expect(page.getByRole('spinbutton', { name: 'Fit clearance per side', exact: true })).toHaveValue('0.5');
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole('button', { name: 'Parameters', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Parameters', exact: true }).click();
   await expect(page.getByRole('spinbutton', { name: 'Fit clearance per side', exact: true })).toBeVisible();
   const width = await page.evaluate(() => ({ actual: document.documentElement.scrollWidth, viewport: innerWidth })); expect(width.actual).toBeLessThanOrEqual(width.viewport);
 });

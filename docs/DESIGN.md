@@ -18,8 +18,8 @@ and focus, readable contrast, and responsive inspection of the actual product.
 
 The desktop preview sits beside the parameters panel. The parameter tabs stay
 visible while controls scroll. The header holds the project tools and export
-action. On phones the parameter panel collapses and the preview retains touch
-orbit controls.
+action. On phones the parameters sit below the preview, with touch orbit controls
+and a floating View options menu in the preview.
 
 No external fonts, photographs, source product images, meshes, third-party logos,
 or textures are needed. All runtime assets remain available offline.
