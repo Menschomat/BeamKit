@@ -21,6 +21,52 @@ test('the preview switches between the lit assembly and print pose', async ({ pa
   await expect(printPose).toHaveAttribute('aria-pressed', 'false');
 });
 
+test('the preview updates during a slider drag and keeps the adjusted camera', async ({ page }) => {
+  await page.goto('/');
+  const export3mf = page.getByRole('button', { name: 'Export 3MF' });
+  await expect(export3mf).toBeEnabled();
+  await page.getByRole('button', { name: 'Print pose' }).click();
+  const canvas = page.locator('.viewport canvas');
+  const viewport = (await canvas.boundingBox())!;
+  const center = { x: viewport.x + viewport.width / 2, y: viewport.y + viewport.height / 2 };
+  const initialPreview = await canvas.screenshot();
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  await page.mouse.move(center.x + 90, center.y + 45, { steps: 5 });
+  await page.mouse.up();
+  await page.mouse.wheel(0, -120);
+  const adjustedPreview = await canvas.screenshot();
+  expect(adjustedPreview.equals(initialPreview)).toBe(false);
+  const dimensions = page.locator('.dimensions');
+  const originalDimensions = await dimensions.innerText();
+
+  const slider = page.getByRole('slider', { name: 'Depth', exact: true });
+  const track = (await slider.boundingBox())!;
+  const sliderY = track.y + track.height / 2;
+  await page.mouse.move(track.x + track.width * 0.45, sliderY);
+  await page.mouse.down();
+  try {
+    await expect(dimensions).not.toHaveText(originalDimensions);
+    const firstDimensions = await dimensions.innerText();
+    expect((await canvas.screenshot()).equals(adjustedPreview)).toBe(false);
+    await page.mouse.move(track.x + track.width * 0.7, sliderY, { steps: 5 });
+    await expect(dimensions).not.toHaveText(firstDimensions);
+  } finally {
+    await page.mouse.up();
+  }
+  await expect(export3mf).toBeEnabled();
+
+  const depth = page.getByRole('spinbutton', { name: 'Depth', exact: true });
+  await depth.fill('100');
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(export3mf).toBeDisabled();
+  await expect.poll(async () => (await canvas.boundingBox())!.height).not.toBe(viewport.height);
+  await depth.fill('12');
+  await expect(export3mf).toBeEnabled();
+  await expect(dimensions).toHaveText(originalDimensions);
+  await expect.poll(async () => (await canvas.screenshot()).equals(adjustedPreview)).toBe(true);
+});
+
 test('theme follows the system until overridden and remembers the choice', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/');

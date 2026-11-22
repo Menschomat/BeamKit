@@ -66,6 +66,10 @@ for (const { width, height } of [{ width: 320, height: 568 }, { width: 390, heig
     await page.setViewportSize({ width, height });
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
+    // The status footer can wrap as initial autosave and offline setup finish.
+    const status = page.getByRole('status');
+    await expect(status).toContainText('Saved locally');
+    await expect(status).toContainText('Offline ready');
     const panel = page.getByRole('complementary', { name: 'Parameters' });
     await panel.scrollIntoViewIfNeeded();
 

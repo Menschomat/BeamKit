@@ -103,6 +103,7 @@ export function createViewport(host: HTMLElement) {
   let displayed: AssemblyResult | null = null;
   let displayedTheme: 'light' | 'dark' | undefined;
   let disposed = false;
+  let cameraInteracted = false;
   let lightingRequested = false;
   let lighting: ReturnType<typeof createPanelLighting> | undefined;
   const render = () => {
@@ -110,11 +111,16 @@ export function createViewport(host: HTMLElement) {
     else renderer.render(scene, camera);
   };
   controls.addEventListener('change', render);
-  const resize = new ResizeObserver(() => {
+  controls.addEventListener('start', () => { cameraInteracted = true; });
+  function resizeViewport() {
     const width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight);
     renderer.setSize(width, height); lighting?.resize(width, height);
-    camera.aspect = width / height; camera.updateProjectionMatrix(); fit();
-  }); resize.observe(host);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    render();
+  }
+  const resize = new ResizeObserver(resizeViewport);
+  resize.observe(host);
   function fit() {
     const bounds = new Box3(); if (lamp.visible) bounds.expandByObject(lamp);
     if (partGroup.children.length) bounds.expandByObject(partGroup);
@@ -135,6 +141,7 @@ export function createViewport(host: HTMLElement) {
     controls.target.copy(center); controls.update(); render();
   }
   function clearParts() { for (const mesh of partGroup.children) (mesh as Mesh).geometry.dispose(); partGroup.clear(); }
+  resizeViewport();
   fit();
   return {
     update(result: AssemblyResult | null, pose: PreviewPose, theme: 'light' | 'dark') {
@@ -175,7 +182,7 @@ export function createViewport(host: HTMLElement) {
           partGroup.add(mesh);
         }
       }
-      if (firstGeometry || poseChanged) fit();
+      if (poseChanged || (firstGeometry && !cameraInteracted)) fit();
       else render();
     },
     dispose() {

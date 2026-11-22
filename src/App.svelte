@@ -49,7 +49,7 @@
   let projectDialog = $state<HTMLDialogElement>();
   let viewport: ReturnType<typeof createViewport> | undefined, controller: GeometryController | undefined;
   let applyUpdate: ((reload?: boolean) => Promise<void>) | undefined;
-  let revision = 0, saveRevision = 0, disposed = false;
+  let revision = 0, previewRevisionFloor = 0, saveRevision = 0, disposed = false;
   let saveTimer: ReturnType<typeof setTimeout>;
   const selectedLamp = $derived(resolveDefinition(lamps, project.lamp));
   const selectedMount = $derived(project.mount ? resolveDefinition(mounts, project.mount) : null);
@@ -73,8 +73,10 @@
       }).catch(() => { if (!disposed) { saving = false; storageError = 'Autosave failed. Save JSON to keep a portable backup.'; } });
     }, 300);
   }
-  function rebuild() {
+  function rebuild(live = false) {
     ++revision; current = false; error = ''; status = 'Generating print geometry…';
+    // Intermediate previews are useful only within the same design and output mode.
+    if (!live) previewRevisionFloor = revision;
     clearTimeout(saveTimer); ++saveRevision; saving = false; saved = false;
     try {
       const snapshot = validateDesign($state.snapshot(project));
@@ -85,7 +87,7 @@
   function remember() { undoStack = [...undoStack.slice(-79), JSON.stringify(project)]; redoStack = []; }
   function replace(next: Design) { remember(); project = structuredClone(next); localName = project.name; rebuild(); }
   function changeParameter(group: 'mount' | 'attachment', key: string, value: number) {
-    remember(); const selection = project[group]; if (selection) selection.parameters[key] = value; rebuild();
+    remember(); const selection = project[group]; if (selection) selection.parameters[key] = value; rebuild(true);
   }
   function changeAttachment(id: string, keepGridDimensions = false) {
     const entry = attachments.find(a => a.id === id)!; remember();
@@ -205,8 +207,10 @@
       catch { previewError = 'WebGL preview is unavailable. Geometry and STL export still work.'; }
     }).catch(() => { previewError = 'The preview could not load. Geometry and STL export still work.'; });
     controller = new GeometryController(() => new Worker(workerUrl, { type: 'module' }), generated => {
-      if (generated.projectRevision !== revision || disposed) return;
-      result = generated; current = true; status = 'Print geometry ready';
+      if (generated.projectRevision < previewRevisionFloor || disposed) return;
+      result = generated;
+      current = generated.projectRevision === revision;
+      if (current) status = 'Print geometry ready';
     }, message => { current = false; error = message; status = 'Generation stopped'; });
     void loadProject('_autosave').then(next => { if (next && !disposed) { project = next; localName = next.name; } return projectNames(); })
       .then(list => { if (!disposed) names = list; }).catch(() => { storageError = 'Local storage is unavailable. Use JSON files to keep your work.'; })
@@ -246,7 +250,7 @@
   <input aria-label="Select project JSON" type="file" accept=".json,application/json" bind:this={fileInput} onchange={importProject} hidden />
   {#if updateReady}<div class="notice"><span>A new version is ready.</span><button disabled={!current} onclick={updateApp}>Save and reload update</button></div>{/if}
   {#if storageError}<p class="notice error-notice" role="alert">{storageError}</p>{/if}
-  {#if error}<div class="notice error-notice" role="alert"><span>{error}</span><button onclick={rebuild}>Retry generation</button></div>{/if}
+  {#if error}<div class="notice error-notice" role="alert"><span>{error}</span><button onclick={() => rebuild()}>Retry generation</button></div>{/if}
 
   <main id="workspace" class="workspace">
     <section class="stage" aria-label="Accessory preview">

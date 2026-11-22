@@ -13,26 +13,61 @@ class FakeWorker {
   postMessage(request: GenerationRequest) { this.requests.push(request); }
   terminate() { this.terminated = true; }
 }
-const tick = () => new Promise(resolve => setTimeout(resolve, 5));
-test('newest revision wins, obsolete busy work terminates, and errors can retry', async () => {
+const publish = (worker: FakeWorker, request: GenerationRequest) => {
+  const result = { projectRevision: request.projectRevision } as AssemblyResult;
+  worker.onmessage!({ data: { ...request, result } });
+};
+
+test('active builds finish and only the latest waiting edit is generated', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const worker = new FakeWorker(), ready: AssemblyResult[] = [];
+  const controller = new GeometryController(() => worker as unknown as WorkerPort, result => ready.push(result), assert.fail);
+  t.after(() => controller.dispose());
+  controller.request(createDesign(), 1);
+  t.mock.timers.tick(16);
+  controller.request(createDesign(), 2);
+  controller.request(createDesign(), 3);
+  t.mock.timers.tick(160);
+  assert.equal(worker.requests.length, 1);
+  assert.equal(worker.terminated, false);
+  publish(worker, worker.requests[0]);
+  assert.deepEqual(ready.map(result => result.projectRevision), [1]);
+  controller.request(createDesign(), 4);
+  t.mock.timers.tick(16);
+  assert.deepEqual(worker.requests.map(request => request.projectRevision), [1, 4]);
+  publish(worker, worker.requests[0]);
+  publish(worker, worker.requests[1]);
+  assert.deepEqual(ready.map(result => result.projectRevision), [1, 4]);
+});
+
+test('superseded failures recover, current failures can retry, and invalidation cancels pending work', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const workers: FakeWorker[] = [], ready: AssemblyResult[] = [], errors: string[] = [];
   const controller = new GeometryController(() => { const worker = new FakeWorker(); workers.push(worker); return worker as unknown as WorkerPort; }, result => ready.push(result), error => errors.push(error));
-  try {
-    controller.request(createDesign(), 1, 0); await tick();
-    const oldCallback = workers[0].onmessage!, old = workers[0].requests[0];
-    controller.request(createDesign(), 2, 0); await tick();
-    assert.ok(workers[0].terminated);
-    oldCallback({ data: { id: old.id, projectRevision: 1, result: { projectRevision: 1 } as AssemblyResult } });
-    assert.equal(ready.length, 0);
-    const latest = workers[1].requests[0];
-    workers[1].onmessage!({ data: { id: latest.id, projectRevision: 2, result: { projectRevision: 2 } as AssemblyResult } });
-    assert.equal(ready[0].projectRevision, 2);
-    controller.request(createDesign(), 3, 0); await tick(); workers[1].onerror!();
-    assert.equal(errors.length, 1);
-    controller.request(createDesign(), 4, 0); await tick(); assert.equal(workers.length, 3);
-    const retry = workers[2].requests[0]; workers[2].onmessage!({ data: { id: retry.id, projectRevision: 4, error: 'Kernel failure' } });
-    assert.equal(errors.at(-1), 'Kernel failure');
-    controller.request(createDesign(), 5, 100); controller.invalidate(); await tick();
-    assert.ok(workers[2].terminated);
-  } finally { controller.dispose(); }
+  t.after(() => controller.dispose());
+  controller.request(createDesign(), 1);
+  t.mock.timers.tick(16);
+  controller.request(createDesign(), 2);
+  workers[0].onerror!();
+  assert.ok(workers[0].terminated);
+  assert.deepEqual(errors, []);
+  publish(workers[0], workers[0].requests[0]);
+  assert.deepEqual(ready, []);
+  t.mock.timers.tick(16);
+  const latest = workers[1].requests[0];
+  workers[1].onmessage!({ data: { ...latest, error: 'Kernel failure' } });
+  assert.deepEqual(errors, ['Kernel failure']);
+  controller.request(createDesign(), 3);
+  t.mock.timers.tick(16);
+  controller.request(createDesign(), 4);
+  controller.invalidate();
+  assert.ok(workers[2].terminated);
+  publish(workers[2], workers[2].requests[0]);
+  t.mock.timers.tick(160);
+  assert.equal(workers.length, 3);
+  assert.deepEqual(ready, []);
+  controller.request(createDesign(), 5);
+  t.mock.timers.tick(16);
+  publish(workers[3], workers[3].requests[0]);
+  assert.equal(ready[0].projectRevision, 5);
 });
