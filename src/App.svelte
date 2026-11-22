@@ -4,8 +4,8 @@
   import { isOfflineReady } from './pwa/readiness.ts';
   import { registerSW } from 'virtual:pwa-register';
   import ParameterField from './app/ParameterField.svelte';
-  import { gridPatternIds, isGridPattern } from './catalog/grid-patterns.ts';
-  import { attachments, connections, lamps, mounts, resolveDefinition } from './catalog/registry.ts';
+  import { isGridPattern } from './catalog/grid-patterns.ts';
+  import { attachments, lamps, mounts, resolveDefinition } from './catalog/registry.ts';
   import { attachmentDefinition, createDesign, decodeDesign, encodeDesign, printDiagnostics, supportsMulticolor, validateDesign } from './domain/project.ts';
   import type { Design } from './domain/project.ts';
   import { orientFrontDown } from './geometry/printability.ts';
@@ -31,9 +31,10 @@
   let undoStack = $state<string[]>([]), redoStack = $state<string[]>([]);
   let settingsTab = $state<'attachment' | 'mount' | 'print'>('attachment');
   let view = $state<ViewOptions>({ mode: 'assembly', lampVisible: true, keepoutsVisible: false, lampOpacity: 0.65 });
-  let showDimensions = $state(true), installOpen = $state(false), mobilePanel = $state<'model' | 'settings' | null>(null);
+  let showSettings = $state(false);
   let host: HTMLDivElement, fileInput: HTMLInputElement;
   let importDialog = $state<HTMLDialogElement>();
+  let projectDialog = $state<HTMLDialogElement>();
   let viewport: ReturnType<typeof createViewport> | undefined, controller: GeometryController | undefined;
   let applyUpdate: ((reload?: boolean) => Promise<void>) | undefined;
   let revision = 0, saveRevision = 0, disposed = false;
@@ -41,13 +42,21 @@
   const selectedLamp = $derived(resolveDefinition(lamps, project.lamp));
   const selectedMount = $derived(project.mount ? resolveDefinition(mounts, project.mount) : null);
   const definition = $derived(attachmentDefinition(project));
-  const gridSelected = $derived(isGridPattern(project.attachment.id));
-  const patternOptions = gridPatternIds.map(id => attachments.find(attachment => attachment.id === id)!);
   const multicolorAvailable = $derived(supportsMulticolor(project));
   const multicolor = $derived(project.export.format === '3mf');
   const diagnostics = $derived(result && current ? result.diagnostics : printDiagnostics(project));
   const dimensions = $derived(result?.parts[0] ? result.parts[0].bounds.max.map((v, i) => v - result!.parts[0].bounds.min[i]) : null);
-  const triangleCount = $derived(result?.parts.reduce((sum, part) => sum + part.mesh.indices.length / 3, 0) ?? 0);
+  const previewViews = [
+    { mode: 'assembly', label: 'Assembled' },
+    { mode: 'part', label: 'Part only' },
+    { mode: 'section', label: 'Section' },
+    { mode: 'print', label: 'Print pose' },
+  ] as const;
+  const settingsTabs = [
+    { id: 'attachment', label: 'Attachment' },
+    { id: 'mount', label: 'Fit' },
+    { id: 'print', label: 'Print' },
+  ] as const;
 
   function scheduleSave(snapshot: Design) {
     clearTimeout(saveTimer); saving = true; saved = false;
@@ -119,8 +128,12 @@
   }
   async function importProject() {
     const file = fileInput.files?.[0]; fileInput.value = ''; if (!file) return;
-    try { if (file.size > 65536) throw new Error('Project exceeds the 64 KiB limit.'); importCandidate = decodeDesign(await file.text()); error = ''; }
+    try {
+      if (file.size > 65536) throw new Error('Project exceeds the 64 KiB limit.');
+      importCandidate = decodeDesign(await file.text()); error = '';
+    }
     catch (cause) { error = (cause as Error).message; }
+    projectDialog?.close();
   }
   function confirmImport() { if (importCandidate) { replace($state.snapshot(importCandidate)); importCandidate = null; } }
   function saveJson() {
@@ -148,7 +161,7 @@
     } catch (cause) { storageError = (cause as Error).message; }
   }
   async function openNamed(name: string) {
-    try { const next = await loadProject(name); if (next) replace(next); }
+    try { const next = await loadProject(name); if (next) { replace(next); projectDialog?.close(); } }
     catch { storageError = 'Could not open this local project. The current design is unchanged.'; }
   }
   async function removeNamed(name: string) {
@@ -196,80 +209,179 @@
 <div class="app-shell">
   <header class="app-header">
     <a class="brand" href="/" aria-label="BeamKit workspace"><span class="brand-mark" aria-hidden="true">B<span>↗</span></span><strong>BeamKit</strong></a>
-    <div class="header-context"><span class="separator">/</span><h1>Lamp attachment designer</h1></div>
-    <div class="header-right"><span class="local-badge"><i></i> Local workspace</span><button class="quiet" onclick={() => installOpen = !installOpen}>Install app</button></div>
-  </header>
-  <div class="command-bar">
-    <div class="command-left"><span class="document-icon" aria-hidden="true">▱</span><span>{project.name}</span><span class="save-state">{booting ? 'Opening…' : saving ? 'Saving…' : saved ? 'Saved locally' : 'Unsaved changes'}</span></div>
-    <div class="command-actions">
-      <div class="history-actions"><button class="icon-button" title="Undo" aria-label="Undo" disabled={booting || !undoStack.length} onclick={() => history('undo')}>↶</button><button class="icon-button" title="Redo" aria-label="Redo" disabled={booting || !redoStack.length} onclick={() => history('redo')}>↷</button></div>
-      <input aria-label="Select project JSON" type="file" accept=".json,application/json" bind:this={fileInput} onchange={importProject} hidden />
-      <button class="quiet" disabled={booting} onclick={() => fileInput.click()}>Import JSON</button><button class="quiet" disabled={booting} onclick={saveJson}>Save JSON</button>
-      <button class="quiet bundle-action" disabled={!current} onclick={saveBundle}>Save bundle</button>
-      <button class="primary" disabled={!current} onclick={exportParts}><span aria-hidden="true">↓</span> {multicolor ? 'Export 3MF' : 'Export STL'}</button>
+    <div class="header-actions">
+      <button class="quiet" onclick={() => projectDialog?.showModal()}>Project</button>
+      <button class="primary" disabled={!current} onclick={exportParts}>{multicolor ? 'Export 3MF' : 'Export STL'}</button>
     </div>
-  </div>
-  {#if installOpen}<div class="notice install-guide"><strong>Install BeamKit</strong><p>In Chrome, use the install icon in the address bar. On Safari, use Share → Add to Dock or Add to Home Screen. Open once online and wait for “Offline ready”. Browser storage can be cleared; keep JSON backups.</p><button onclick={() => installOpen = false}>Close guidance</button></div>{/if}
-  {#if updateReady}<div class="notice"><span>A new version is ready. Your design will be saved before reloading.</span><button disabled={!current} onclick={updateApp}>Save and reload update</button></div>{/if}
+  </header>
+  <input aria-label="Select project JSON" type="file" accept=".json,application/json" bind:this={fileInput} onchange={importProject} hidden />
+  {#if updateReady}<div class="notice"><span>A new version is ready.</span><button disabled={!current} onclick={updateApp}>Save and reload update</button></div>{/if}
   {#if storageError}<p class="notice error-notice" role="alert">{storageError}</p>{/if}
   {#if error}<div class="notice error-notice" role="alert"><span>{error}</span><button onclick={rebuild}>Retry generation</button></div>{/if}
-  <div class="mobile-tools"><button aria-expanded={mobilePanel === 'model'} onclick={() => mobilePanel = mobilePanel === 'model' ? null : 'model'}>Model & projects</button><button aria-expanded={mobilePanel === 'settings'} onclick={() => mobilePanel = mobilePanel === 'settings' ? null : 'settings'}>Parameters</button></div>
+
   <main id="workspace" class="workspace">
-    <aside class:mobile-open={mobilePanel === 'model'} class="model-panel sidebar">
-      <div class="panel-label"><span>Design setup</span><span class="step-count">01 / 03</span></div>
-      <section class="setup-section"><label class="section-heading" for="lamp">Lamp</label><select id="lamp" disabled={booting} value={project.lamp.id} onchange={event => changeLamp(event.currentTarget.value)}>{#each lamps as lamp}<option value={lamp.id}>{lamp.label}</option>{/each}</select><p class="spec-line">{selectedLamp.body.width} × {selectedLamp.body.height} × {selectedLamp.body.depth} mm <span class="tiny-badge">Reference</span></p></section>
-      <section class="setup-section"><h2 class="section-heading">One printable model</h2><p class="field-help">The mount and light-control structure form a single accessory. STL export places its front face on the bed.</p><details class="advanced-output"><summary>Advanced test tools</summary><label class="section-heading" for="output-mode">Output</label><select id="output-mode" disabled={booting} value={project.assembly.mode} onchange={event => changeMode(event.currentTarget.value as Design['assembly']['mode'])}><option value="integrated">Single integrated model</option><option value="fit-test">Fit coupon only</option><option value="standalone">Attachment only</option></select><p class="field-help">The fit coupon tests lamp contact and control access before the full print.</p></details></section>
-      <section class="setup-section"><h2 class="section-heading">Attachment</h2><div class="attachment-list">{#each [gridSelected ? definition : patternOptions[0], attachments.find(entry => entry.id === 'diffusion-sheet-holder')!] as attachment}<button disabled={booting} class="attachment-option" class:selected={project.attachment.id === attachment.id && project.attachment.revision === attachment.revision} aria-pressed={project.attachment.id === attachment.id && project.attachment.revision === attachment.revision} onclick={() => changeAttachment(attachment.id)}><span class="attachment-glyph" aria-hidden="true">{isGridPattern(attachment.id) ? '⬡' : '▣'}</span><span><strong>{attachment.label}</strong><small>{isGridPattern(attachment.id) ? 'Spill control' : 'Commercial diffusion material'}</small></span><span class="radio-dot" aria-hidden="true"></span></button>{/each}</div></section>
-      <section class="setup-section mount-summary"><h2 class="section-heading">Lamp access</h2><p class="field-help">USB, switch, button and dial access volumes are excluded from the collar.</p><details><summary>Modular connection</summary><p class="field-help">{connections[0].reason}</p></details></section>
-      <details class="projects-section" open><summary>Local projects <span>{names.length}</span></summary><label for="project-name" class="project-name-label">Project name</label><input id="project-name" bind:value={localName} maxlength="100" /><button class="full-width" disabled={booting} onclick={saveNamed}>Save locally</button>{#each names as name}<div class="saved-project"><button class="quiet" onclick={() => openNamed(name)}>{name}</button><button class="quiet icon-button" aria-label={`Delete ${name}`} onclick={() => removeNamed(name)}>×</button></div>{/each}<button class="text-button" onclick={showHistory}>View autosave history</button>{#each historyItems.slice(0, 5) as item}<button class="history-item" onclick={() => { replace(item.project); historyItems = []; }}>{new Date(Number(item.key.split(':')[1])).toLocaleString()}</button>{/each}<p class="field-help">Stored in this browser. JSON is your portable backup.</p></details>
-    </aside>
     <section class="stage" aria-label="Accessory preview">
-      <div class="stage-header"><div><span class="eyebrow">{selectedLamp.label} / {project.assembly.mode === 'fit-test' ? 'Collar' : definition.label}</span><h2>{project.assembly.mode === 'fit-test' ? 'Collar fit test' : `${definition.label} assembly`}</h2></div><span class="prototype-badge">Prototype</span></div>
+      <div class="stage-header">
+        <div class="stage-title">
+          <h1>{selectedLamp.label}</h1>
+          {#if dimensions}
+            <p class="dimensions" aria-label="Model dimensions">{dimensions.map(value => value.toFixed(1)).join(' × ')} mm</p>
+          {/if}
+        </div>
+        <button class="settings-toggle" aria-expanded={showSettings} aria-controls="parameters" onclick={() => showSettings = !showSettings}>Parameters</button>
+      </div>
       <div class="viewport" bind:this={host}></div>
-      {#if !current && result}<span class="stale-badge">Previous geometry · updating</span>{/if}
+      {#if !current && result}<span class="stale-badge">Updating preview…</span>{/if}
       {#if previewError}<p class="preview-error">{previewError}</p>{/if}
-      <div class="view-toolbar"><div class="segmented" aria-label="Preview view">{#each [['assembly','Assembled'],['part','Part only'],['section','Section'],['print','Print pose']] as [mode, label]}<button aria-pressed={view.mode === mode} class:active={view.mode === mode} onclick={() => view.mode = mode as ViewOptions['mode']}>{label}</button>{/each}</div><div class="camera-actions"><button class="quiet" onclick={() => viewport?.fit(true)}>Front view</button><button class="quiet" onclick={() => viewport?.fit()}>Fit view</button></div></div>
-      <div class="view-options"><label><input type="checkbox" bind:checked={view.lampVisible} /> Lamp reference</label><label><input type="checkbox" bind:checked={view.keepoutsVisible} /> Access volumes</label><label><input type="checkbox" bind:checked={showDimensions} /> Dimensions</label><label class="opacity-control">Opacity<input aria-label="Lamp reference opacity" type="range" min="0.1" max="0.8" step="0.05" bind:value={view.lampOpacity} /></label></div>
-      {#if showDimensions && dimensions}<div class="dimension-strip"><span><small>Width</small>{dimensions[0].toFixed(1)} <em>mm</em></span><span><small>Height</small>{dimensions[1].toFixed(1)} <em>mm</em></span><span><small>Depth</small>{dimensions[2].toFixed(1)} <em>mm</em></span><span class="mesh-stat"><small>Print mesh</small>{triangleCount.toLocaleString()} <em>triangles</em></span></div>{/if}
-      <div class="stage-footnote"><span>Orbit to inspect · scroll to zoom</span><span>mm · +Z light direction</span></div>
+      <div class="preview-controls">
+        <div class="view-toolbar">
+          <div class="segmented" role="group" aria-label="Preview view">
+            {#each previewViews as { mode, label }}
+              <button aria-pressed={view.mode === mode} onclick={() => view.mode = mode}>{label}</button>
+            {/each}
+          </div>
+          <details class="view-menu">
+            <summary>View options</summary>
+            <div class="view-options">
+              <div class="camera-actions">
+                <button class="quiet" onclick={() => viewport?.fit(true)}>Front view</button>
+                <button class="quiet" onclick={() => viewport?.fit()}>Fit view</button>
+              </div>
+              <label><input type="checkbox" bind:checked={view.lampVisible} /> Lamp reference</label>
+              <label><input type="checkbox" bind:checked={view.keepoutsVisible} /> Access volumes</label>
+              <label class="opacity-control">Lamp opacity<input aria-label="Lamp reference opacity" type="range" min="0.1" max="0.8" step="0.05" bind:value={view.lampOpacity} /></label>
+            </div>
+          </details>
+        </div>
+      </div>
     </section>
-    <aside class:mobile-open={mobilePanel === 'settings'} class="settings-panel sidebar">
-      <div class="panel-label"><span>Parameters</span><button class="text-button" disabled={booting} onclick={resetPreset}>Reset preset</button></div>
-      <div class="settings-tabs">{#each [['attachment','Attachment'],['mount','Fit'],['print','Print']] as [tab, label]}<button class:active={settingsTab === tab} aria-pressed={settingsTab === tab} onclick={() => settingsTab = tab as typeof settingsTab}>{label}</button>{/each}</div>
+    <aside id="parameters" aria-label="Parameters" class:mobile-open={showSettings} class="settings-panel">
+      <div class="settings-tabs" role="group" aria-label="Parameter groups">
+        {#each settingsTabs as { id, label }}
+          <button aria-pressed={settingsTab === id} onclick={() => settingsTab = id}>{label}</button>
+        {/each}
+      </div>
       <div class="settings-body">
         {#if settingsTab === 'attachment'}
-          <div class="settings-intro"><h2>{definition.label}</h2><p>{definition.description}</p></div>
-          {#if gridSelected}
-            <div class="parameter">
-              <label class="section-heading" for="grid-pattern">Pattern</label>
-              <select id="grid-pattern" disabled={booting} value={project.attachment.id}
-                onchange={event => changeAttachment(event.currentTarget.value, true)}>
-                {#each patternOptions as pattern}<option value={pattern.id}>{pattern.label}</option>{/each}
-              </select>
-            </div>
-          {/if}
+          <div class="parameter attachment-select">
+            <label class="section-heading" for="attachment">Attachment type</label>
+            <select id="attachment" disabled={booting} value={project.attachment.id}
+              onchange={event => changeAttachment(event.currentTarget.value,
+                isGridPattern(project.attachment.id) && isGridPattern(event.currentTarget.value))}>
+              {#each attachments as attachment}<option value={attachment.id}>{attachment.label}</option>{/each}
+            </select>
+          </div>
           {#each definition.fields as field (field.key)}
             <ParameterField {field} value={project.attachment.parameters[field.key]} disabled={booting} prefix="attachment" onchange={value => changeParameter('attachment', field.key, value)} />
           {/each}
-        {:else if settingsTab === 'mount'}<div class="settings-intro"><h2>Lamp fit</h2><p>Clearance is specified per side. Access envelopes always take priority.</p></div>{#if project.mount}{#each selectedMount?.fields ?? [] as field}<ParameterField {field} value={project.mount.parameters[field.key]} disabled={booting} prefix="mount" onchange={value => changeParameter('mount', field.key, value)} />{/each}{:else}<p class="field-help">Choose an integrated output to edit the lamp fit.</p>{/if}
-        {:else}<div class="settings-intro"><h2>Print profile</h2><p>Designed around a Bambu Lab printer with a 0.4 mm nozzle. Assign filaments and slice in your preferred slicer.</p></div>{#if multicolorAvailable}
-          <div class="multicolor-settings">
-            <label><input type="checkbox" checked={multicolor} disabled={booting} onchange={event => changeMulticolor(event.currentTarget.checked)} /> Multicolor printing</label>
-            {#if multicolor}
-              <ul class="material-key">
-                {#each Object.values(materialRegions) as region}
-                  <li><i style:background={region.color}></i>{region === materialRegions.honeycomb ? gridMaterialLabel(project.attachment.id) : region.label}</li>
-                {/each}
-              </ul>
-              <p class="field-help">The 0.8 mm liner runs around the grid. Import the 3MF as one object with three parts, then assign filaments in your slicer.</p>
-            {/if}
+        {:else if settingsTab === 'mount'}
+          {#if project.assembly.mode !== 'standalone' && project.mount}
+            {#each selectedMount?.fields ?? [] as field}
+              <ParameterField {field} value={project.mount.parameters[field.key]} disabled={booting} prefix="mount" onchange={value => changeParameter('mount', field.key, value)} />
+            {/each}
+          {:else}
+            <p class="field-help">Select a mounted model or fit coupon under Print to adjust lamp fit.</p>
+          {/if}
+        {:else}
+          <div class="parameter">
+            <label for="output-mode" class="section-heading">Output</label>
+            <select id="output-mode" disabled={booting} value={project.assembly.mode} onchange={event => changeMode(event.currentTarget.value as Design['assembly']['mode'])}>
+              <option value="integrated">Mounted accessory</option>
+              <option value="fit-test">Fit coupon only</option>
+              <option value="standalone">Attachment only</option>
+            </select>
           </div>
+          {#if multicolorAvailable}
+            <div class="multicolor-settings">
+              <label class="check-row"><input type="checkbox" checked={multicolor} disabled={booting} onchange={event => changeMulticolor(event.currentTarget.checked)} /> Multicolor printing</label>
+              {#if multicolor}
+                <ul class="material-key">
+                  {#each Object.values(materialRegions) as region}
+                    <li><i style:background={region.color}></i>{region === materialRegions.honeycomb ? gridMaterialLabel(project.attachment.id) : region.label}</li>
+                  {/each}
+                </ul>
+                <p class="field-help">Assign the three 3MF parts to filaments in your slicer.</p>
+              {/if}
+            </div>
+          {/if}
+          <details class="print-notes">
+            <summary>Print notes</summary>
+            <p>Starting point for a 0.4 mm nozzle on a Bambu Lab printer: front face on the bed, 0.20 mm layers, 4 walls, and 0–10% infill.</p>
+            <div class="parameter">
+              <label for="material" class="section-heading">Planned material</label>
+              <select id="material" value={project.printProfile.material} onchange={event => { remember(); project.printProfile.material = event.currentTarget.value as Design['printProfile']['material']; rebuild(); }}>
+                <option value="unspecified">Choose in slicer</option><option>PLA</option><option>PETG</option><option>ASA</option>
+              </select>
+            </div>
+            {#each diagnostics as note}<p class:warning={note.level === 'warning'}>{note.message}</p>{/each}
+          </details>
         {/if}
-        <dl class="print-specs"><div><dt>Nozzle diameter</dt><dd>0.4 mm</dd></div><div><dt>Default grid walls</dt><dd>0.8 mm · 2 nominal paths</dd></div><div><dt>Model scale</dt><dd>Millimetres</dd></div><div><dt>Print orientation</dt><dd>Front face on bed</dd></div><div><dt>Starting setup</dt><dd>0.20 mm layers · 4 walls</dd></div><div><dt>Infill</dt><dd>0–10% · inspect in slicer</dd></div></dl><label for="material" class="section-heading">Planned material</label><select id="material" value={project.printProfile.material} onchange={event => { remember(); project.printProfile.material = event.currentTarget.value as Design['printProfile']['material']; rebuild(); }}><option value="unspecified">Choose in slicer</option><option>PLA</option><option>PETG</option><option>ASA</option></select><p class="field-help">Material choice does not certify temperature resistance. Confirm walls, orientation, supports and fit in the slicer.</p>{/if}
       </div>
-      <details class="diagnostics" open><summary><span class="warning-dot"></span>Print notes <span>{diagnostics.length}</span></summary>{#each diagnostics as note}<p class:warning={note.level === 'warning'}>{note.message}</p>{/each}</details>
+      <div class="settings-footer"><button class="quiet" disabled={booting} onclick={resetPreset}>Reset preset</button></div>
     </aside>
   </main>
-  <footer class="status-bar"><span role="status"><i class:ready={current}></i>{status}{#if current && result}<span class="status-detail"> · {Math.round(result.elapsedMs)} ms · 1 connected part{#if result.printAnalysis && result.printAnalysis.steepOverhangAreaMm2 < 0.00001} · 45° check passed{/if}</span>{/if} · {saving ? 'Saving…' : saved ? 'Saved locally' : 'Not saved'}{#if offlineReady} · Offline ready{/if}</span><a href={licenseUrl} target="_blank" rel="noreferrer">Generated output · CC0 1.0 ↗</a></footer>
+  <footer class="status-bar">
+    <span role="status"><i class:ready={current}></i>{status}{#if saving} · Saving…{:else if saved} · Saved locally{/if}{#if offlineReady} · Offline ready{/if}</span>
+    <a href={licenseUrl} target="_blank" rel="noreferrer">Model output · CC0 1.0</a>
+  </footer>
 </div>
-{#if importCandidate}<dialog class="import-dialog" bind:this={importDialog} aria-labelledby="import-title" oncancel={() => importCandidate = null}><span class="eyebrow">Project import</span><h2 id="import-title">Review this design</h2><dl><div><dt>Name</dt><dd>{importCandidate.name}</dd></div><div><dt>Lamp</dt><dd>{importCandidate.lamp.id} · rev {importCandidate.lamp.revision}</dd></div><div><dt>Attachment</dt><dd>{importCandidate.attachment.id} · rev {importCandidate.attachment.revision}</dd></div><div><dt>Output</dt><dd>{importCandidate.assembly.mode} · mm</dd></div></dl><p>Your current design stays intact until you import. You can undo the replacement.</p><div class="dialog-actions"><button onclick={() => importCandidate = null}>Cancel import</button><button class="primary" onclick={confirmImport}>Import design</button></div></dialog>{/if}
+
+<dialog class="editor-dialog" bind:this={projectDialog} aria-labelledby="project-title">
+  <div class="dialog-header"><h2 id="project-title">Project</h2><button class="quiet" onclick={() => projectDialog?.close()}>Close</button></div>
+  {#if lamps.length > 1}
+    <div class="parameter">
+      <label class="section-heading" for="lamp">Lamp</label>
+      <select id="lamp" disabled={booting} value={project.lamp.id} onchange={event => changeLamp(event.currentTarget.value)}>
+        {#each lamps as lamp}<option value={lamp.id}>{lamp.label}</option>{/each}
+      </select>
+    </div>
+  {/if}
+  <form class="project-form" onsubmit={event => { event.preventDefault(); void saveNamed(); }}>
+    <label class="section-heading" for="project-name">Project name</label>
+    <div class="project-name-row">
+      <input id="project-name" bind:value={localName} maxlength="100" required />
+      <button disabled={booting} type="submit">Save locally</button>
+    </div>
+  </form>
+  {#if storageError}<p class="field-error" role="alert">{storageError}</p>{/if}
+  {#each names as name}
+    <div class="saved-project">
+      <button class="quiet" onclick={() => openNamed(name)}>{name}</button>
+      <button class="quiet" aria-label={`Delete ${name}`} onclick={() => removeNamed(name)}>Delete</button>
+    </div>
+  {/each}
+  <div class="project-actions">
+    <button disabled={booting} onclick={() => fileInput.click()}>Import JSON</button>
+    <button disabled={booting} onclick={saveJson}>Save JSON</button>
+    <button disabled={!current} onclick={saveBundle}>Save bundle</button>
+    <button disabled={booting || !undoStack.length} onclick={() => { history('undo'); projectDialog?.close(); }}>Undo</button>
+    <button disabled={booting || !redoStack.length} onclick={() => { history('redo'); projectDialog?.close(); }}>Redo</button>
+  </div>
+  <details ontoggle={event => { if (event.currentTarget.open) void showHistory(); }}>
+    <summary>Autosave history</summary>
+    {#each historyItems.slice(0, 5) as item}
+      <button class="history-item" onclick={() => { replace(item.project); historyItems = []; projectDialog?.close(); }}>{new Date(Number(item.key.split(':')[1])).toLocaleString()}</button>
+    {/each}
+  </details>
+  <details>
+    <summary>Install app</summary>
+    <p class="field-help">Use the install icon in Chrome, or Share → Add to Dock or Add to Home Screen in Safari. Wait for “Offline ready” before using BeamKit offline.</p>
+  </details>
+</dialog>
+
+{#if importCandidate}
+  <dialog class="editor-dialog" bind:this={importDialog} aria-labelledby="import-title" oncancel={() => importCandidate = null}>
+    <h2 id="import-title">Import project</h2>
+    <dl class="import-summary">
+      <div><dt>Name</dt><dd>{importCandidate.name}</dd></div>
+      <div><dt>Lamp</dt><dd>{resolveDefinition(lamps, importCandidate.lamp).label}</dd></div>
+      <div><dt>Attachment</dt><dd>{attachmentDefinition(importCandidate).label}</dd></div>
+      <div><dt>Output</dt><dd>{importCandidate.assembly.mode === 'fit-test' ? 'Fit coupon' : importCandidate.assembly.mode === 'standalone' ? 'Attachment only' : 'Mounted accessory'}</dd></div>
+    </dl>
+    <p class="field-help">Import replaces the current design. You can undo it.</p>
+    <div class="dialog-actions">
+      <button onclick={() => importCandidate = null}>Cancel import</button>
+      <button class="primary" onclick={confirmImport}>Import design</button>
+    </div>
+  </dialog>
+{/if}
