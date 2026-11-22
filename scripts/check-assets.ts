@@ -10,6 +10,12 @@ if (forbidden.length) throw new Error('Private CAD or generated print files ente
 for (const path of files.filter(path => /\.(?:js|html|css|json)$/.test(path))) {
   if ((await readFile(path, 'utf8')).includes('SmallRig_Vibe_P96L_Light')) throw new Error(`Private reference content found in ${path}`);
 }
+for (const filename of ['dist/_headers', 'dist/404.html', 'dist/manifest.webmanifest']) {
+  if (!files.includes(filename)) throw new Error(`Static build misses ${filename}`);
+}
 const sw = await readFile('dist/sw.js', 'utf8');
-for (const extension of ['.wasm', 'grid.worker-', 'icon-512.png']) if (!sw.includes(extension)) throw new Error(`Offline cache misses ${extension}`);
-console.log(`Checked ${files.length} built files: no private CAD assets; worker, WASM and maskable icon precached.`);
+const runtimeAssets = files.filter(path => /^dist\/assets\/.*\.(?:js|css|wasm)$/.test(path));
+for (const path of ['dist/index.html', 'dist/icon-512.png', ...runtimeAssets]) {
+  if (!sw.includes(path.slice('dist/'.length))) throw new Error(`Offline cache misses ${path}`);
+}
+console.log(`Checked ${files.length} built files. Pages files are present, the preview is precached, and private assets are excluded.`);

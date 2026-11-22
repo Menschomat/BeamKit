@@ -13,7 +13,16 @@ generated_images/
 .playwright-cli/
 output/playwright/
 
-# Private third-party lamp reference; never bundle or export.
-/etc/SmallRig Vibe P96L Light - 7402666/
+# Local CAD references, photos, and design screenshots.
+/etc/
 
 .taste-skill/
+
+# Local build credentials and Wrangler state.
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/

@@ -1,20 +1,18 @@
 # BeamKit
 
-Design printable SmallRig P96L accessories in your browser. Choose a honeycomb
-or diffusion sheet holder, adjust the geometry, and export one integrated STL in
-millimetres. The front face is placed on the print bed for the current presets.
-An optional fit coupon is available under Advanced test tools.
+Design printable SmallRig P96L accessories in your browser. Use **Attachment
+type** to choose a honeycomb, square or rectangular eggcrate, parallel louvers,
+or a diffusion sheet holder. Adjust the geometry and export one integrated
+STL in millimetres. The current presets place the front face on the print
+bed. Use **Print → Output → Fit coupon only** to test fit with a smaller print.
 
-Choose a **Pattern** in the grid attachment settings. Honeycomb is the default.
-Square and rectangular eggcrate share the same frame and mount. Turn the
-rectangular openings or louver slats by 90° to change which axis gets more
-spill control. The presets are starting dimensions, not measured beam angles.
+Rectangular eggcrate and louvers can turn 90° to change the direction of spill
+control. The presets are starting dimensions. Beam angles require measurement.
 
-For an integrated light grid, open **Print → Multicolor printing** to preview
-and export one 3MF with three parts: a black grid or louvers, a 0.8 mm gray inner
-shell, and an orange outer shell with clips. Import it as a single multipart model
-and assign a filament to each part in the slicer. The preview colors identify
-the regions, while the slicer controls the real filaments and printer settings.
+For an integrated light grid, enable **Print → Multicolor printing** to preview
+and export a 3MF with a near-black grid, a 0.8 mm granite-gray inner shell, and
+a lemon-yellow outer shell with clips. Import the 3MF as one multipart model
+and assign the filaments in your slicer.
 
 ## Development
 
@@ -34,7 +32,8 @@ Run `npx playwright install chromium` once, then `npm run build` and `npm run te
 
 See [the validation report](docs/VALIDATION.md) for milestone status and unverified checks.
 
-The static build goes to `dist/`. The [print test guide](docs/PRINT_TESTS.md)
+The static build goes to `dist/`. See the [Cloudflare Pages setup](docs/DEPLOYMENT.md)
+for Git integration and deployment checks. The [print test guide](docs/PRINT_TESTS.md)
 records the starting dimensions and checks for the click-on prototype. Physical
 fit, retention, heat and optical behavior still need hardware testing.
 

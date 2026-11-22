@@ -1,9 +1,5 @@
 # Static build and deployment preparation
 
-Nothing in this work authorizes publishing. These instructions prepare a portable
-static build. Deployment, origin checks, and GitHub branch protection require a
-later authorized release step.
-
 ## Build
 
 Use Node 24 and `npm ci`. Run `npm run check`, `npm test`, `npm run schema`,
@@ -13,22 +9,31 @@ A development server does not provide production offline caching.
 
 ## Cloudflare Pages
 
-The included `wrangler.toml` names `dist` as the Pages build output directory.
-For a Git-based Pages build, set the build command to `npm run build`, output to
-`dist`, and Node to the version in `.nvmrc`. No account secrets, Functions, backend,
-cross-origin isolation, or runtime network imports are required.
+Create a Git-integrated Pages project from the GitHub repository after pushing
+`main`. Use these settings:
 
-`public/_headers` prevents persistent caching of the service worker, manifest and
-index while caching hashed assets immutably. A top-level `404.html` prevents
-Cloudflare Pages' automatic SPA fallback from turning missing JS/WASM requests
-into the editor HTML. This app has one route and needs no `_redirects` rules.
-Cloudflare does not support 404 rewrites in `_redirects`.
+| Setting | Value |
+| --- | --- |
+| Production branch | `main` |
+| Root directory | Repository root |
+| Build command | `npm run build && npm run check:assets` |
+| Build output directory | `dist` |
+| Node.js | 24 from `.nvmrc` |
 
-References checked 2026-11-21:
-- https://developers.cloudflare.com/pages/configuration/serving-pages/
-- https://developers.cloudflare.com/pages/configuration/redirects/
+Pages installs dependencies from the repository. The app builds into static
+assets and needs no account secrets or Functions. The included `wrangler.toml`
+also points to `dist` for local testing with `npx wrangler pages dev`.
+The GitHub Actions workflow runs tests independently of the Pages build and
+deployment.
 
-After an authorized deployment, check HTTPS, manifest scope, root navigation,
+`public/_headers` revalidates the root document, service worker, and manifest.
+Hashed assets cache immutably. The top-level `404.html` makes missing assets
+return a 404. [Pages serving rules](https://developers.cloudflare.com/pages/configuration/serving-pages/)
+
+[Git integration setup](https://developers.cloudflare.com/pages/get-started/git-integration/) ·
+[Pages build image](https://developers.cloudflare.com/pages/configuration/build-image/)
+
+After the first deployment, check HTTPS, manifest scope, root navigation,
 `.wasm` MIME type (`application/wasm`), worker paths, missing-asset 404 status,
 cache headers and both fresh and upgraded installs on that actual origin.
 Do not mark a release verified from a local preview alone.
