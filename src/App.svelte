@@ -44,7 +44,7 @@
   let historyItems = $state<{ key: string; project: Design }[]>([]);
   let undoStack = $state<string[]>([]), redoStack = $state<string[]>([]);
   let settingsTab = $state<'attachment' | 'mount' | 'print'>('attachment');
-  let view = $state<ViewOptions>({ mode: 'assembly', lampVisible: true, lampOn: false, keepoutsVisible: false, lampOpacity: 0.65 });
+  let view = $state<ViewOptions>({ mode: 'assembly', lampVisible: true, lampOn: true, keepoutsVisible: false, lampOpacity: 0.65 });
   let showSettings = $state(false);
   let host: HTMLDivElement, fileInput: HTMLInputElement;
   let importDialog = $state<HTMLDialogElement>();

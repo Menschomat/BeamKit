@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('the lamp can light up the assembled preview', async ({ page }) => {
+test('the assembled preview starts lit and the lamp can be toggled', async ({ page }) => {
   await page.goto('/');
   const exportStl = page.getByRole('button', { name: 'Export STL', exact: true });
   await expect(exportStl).toBeEnabled();
@@ -9,7 +9,8 @@ test('the lamp can light up the assembled preview', async ({ page }) => {
   await page.getByText('View options', { exact: true }).click();
   await page.getByRole('button', { name: 'Front view', exact: true }).click();
   const lampOn = page.getByRole('checkbox', { name: 'Lamp on', exact: true });
-  await expect(lampOn).not.toBeChecked();
+  await expect(lampOn).toBeChecked();
+  await lampOn.uncheck();
   const unlit = await canvas.screenshot();
   await lampOn.check();
   expect((await canvas.screenshot()).equals(unlit)).toBe(false);
