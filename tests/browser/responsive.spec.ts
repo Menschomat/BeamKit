@@ -17,11 +17,14 @@ for (const width of [320, 390, 640, 768, 900, 1024, 1440]) {
     expect(toggle.y + toggle.height).toBeLessThanOrEqual(bounds!.y);
     if (width <= 600) {
       const heading = (await page.getByRole('heading', { name: 'SmallRig P96L' }).boundingBox())!;
+      const lamp = (await page.getByRole('combobox', { name: 'Lamp', exact: true }).boundingBox())!;
       const assembled = (await pose.getByRole('button', { name: 'Assembled' }).boundingBox())!;
       const printPose = (await pose.getByRole('button', { name: 'Print pose' }).boundingBox())!;
       expect(toggle.x).toBeGreaterThan(heading.x + heading.width);
       expect(toggle.y).toBeLessThan(heading.y + heading.height);
       expect(toggle.width).toBeLessThanOrEqual(160);
+      expect(lamp.x + lamp.width).toBeLessThanOrEqual(toggle.x);
+      expect(lamp.height).toBeGreaterThanOrEqual(44);
       expect(assembled.width).toBeCloseTo(printPose.width);
       expect(Math.min(assembled.height, printPose.height)).toBeGreaterThanOrEqual(44);
     }

@@ -1,14 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 test('Neewer selection changes the preview, persists, and exports model-specific files', async ({ page }) => {
-  const project = page.getByRole('button', { name: 'Project', exact: true });
-  const lamp = page.getByLabel('Lamp', { exact: true });
+  const lamp = page.getByRole('region', { name: 'Accessory preview' }).getByRole('combobox', { name: 'Lamp', exact: true });
   const export3mf = page.getByRole('button', { name: 'Export 3MF' });
   await page.goto('/');
   await expect(export3mf).toBeEnabled();
-  await project.click();
+  await expect(lamp).toHaveValue('smallrig.p96l');
   await lamp.selectOption('neewer.tl21c');
-  await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Neewer TL21C' })).toBeVisible();
   await expect(page.locator('.dimensions')).toHaveText('221.2 × 46.3 × 50.8 mm');
   await expect(page.locator('.viewport canvas')).toBeVisible();
@@ -30,9 +28,7 @@ test('Neewer selection changes the preview, persists, and exports model-specific
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Neewer TL21C' })).toBeVisible();
   await expect(exportStl).toBeEnabled();
-  await project.click();
   await lamp.selectOption('smallrig.p96l');
-  await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'SmallRig P96L' })).toBeVisible();
   await expect(exportStl).toBeEnabled();
 });

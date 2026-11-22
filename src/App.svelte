@@ -260,10 +260,15 @@
   <main id="workspace" class="workspace">
     <section class="stage" aria-label="Accessory preview">
       <div class="stage-header">
-        <div class="stage-title">
+        <div class="stage-title" class:lamp-picker={lamps.length > 1}>
           <h1>{selectedLamp.label}</h1>
           {#if dimensions}
             <p class="dimensions" aria-label="Model dimensions">{dimensions.map(value => value.toFixed(1)).join(' × ')} mm</p>
+          {/if}
+          {#if lamps.length > 1}
+            <select aria-label="Lamp" disabled={booting} value={project.lamp.id} onchange={event => changeLamp(event.currentTarget.value)}>
+              {#each lamps as lamp}<option value={lamp.id}>{lamp.label}</option>{/each}
+            </select>
           {/if}
         </div>
         <div class="pose-toggle" role="group" aria-label="Preview pose">
@@ -356,14 +361,6 @@
 
 <dialog class="editor-dialog" bind:this={projectDialog} aria-labelledby="project-title">
   <div class="dialog-header"><h2 id="project-title">Project</h2><button class="quiet" onclick={() => projectDialog?.close()}>Close</button></div>
-  {#if lamps.length > 1}
-    <div class="parameter">
-      <label class="section-heading" for="lamp">Lamp</label>
-      <select id="lamp" disabled={booting} value={project.lamp.id} onchange={event => changeLamp(event.currentTarget.value)}>
-        {#each lamps as lamp}<option value={lamp.id}>{lamp.label}</option>{/each}
-      </select>
-    </div>
-  {/if}
   <form class="project-form" onsubmit={event => { event.preventDefault(); void saveNamed(); }}>
     <label class="section-heading" for="project-name">Project name</label>
     <div class="project-name-row">

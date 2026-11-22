@@ -28,7 +28,7 @@ the lamp-facing side. **Fit → Diffuser clearance** controls the Z-axis gap and
 defaults to 0.8 mm. Grid exits remain on a flat print face, so the cells are
 deeper toward the sides. The sheet holder retains its flat sheet pocket.
 
-In BeamKit, choose **Project → Lamp → Neewer TL21C**. Choose **Print → Fit coupon
+In BeamKit, choose **Neewer TL21C** from the lamp name above the 3D view. Choose **Print → Fit coupon
 only**, print it with the intended material and a 0.4 mm nozzle, and try it across
 the unpowered lamp. Check clip insertion, release and retention, clearance at
 the diffuser, and access with a USB-C cable and end-mounted plate fitted.
