@@ -17,8 +17,7 @@
   import type { AssemblyResult } from './generators/assembly.ts';
   import { GeometryController } from './geometry/controller.ts';
   import { autosaveHistory, deleteProject, loadProject, projectNames, saveProject } from './storage/projects.ts';
-  import type { createViewport } from './viewport.ts';
-  import type { ViewOptions } from './viewport.ts';
+  import type { createViewport, PreviewPose } from './viewport.ts';
 
   type ThemePreference = 'system' | 'light' | 'dark';
   const themeKey = 'beamkit-theme';
@@ -44,7 +43,7 @@
   let historyItems = $state<{ key: string; project: Design }[]>([]);
   let undoStack = $state<string[]>([]), redoStack = $state<string[]>([]);
   let settingsTab = $state<'attachment' | 'mount' | 'print'>('attachment');
-  let view = $state<ViewOptions>({ mode: 'assembly', lampVisible: true, lampOn: true, keepoutsVisible: false, lampOpacity: 0.65 });
+  let pose = $state<PreviewPose>('assembly');
   let host: HTMLDivElement, fileInput: HTMLInputElement;
   let importDialog = $state<HTMLDialogElement>();
   let projectDialog = $state<HTMLDialogElement>();
@@ -59,12 +58,6 @@
   const multicolor = $derived(project.export.format === '3mf');
   const diagnostics = $derived(result && current ? result.diagnostics : printDiagnostics(project));
   const dimensions = $derived(result?.parts[0] ? result.parts[0].bounds.max.map((v, i) => v - result!.parts[0].bounds.min[i]) : null);
-  const previewViews = [
-    { mode: 'assembly', label: 'Assembled' },
-    { mode: 'part', label: 'Part only' },
-    { mode: 'section', label: 'Section' },
-    { mode: 'print', label: 'Print pose' },
-  ] as const;
   const settingsTabs = [
     { id: 'attachment', label: 'Attachment' },
     { id: 'mount', label: 'Fit' },
@@ -208,7 +201,7 @@
     applyUpdate = registerSW({ onOfflineReady() { refreshReadiness(); }, onNeedRefresh() { updateReady = true; }, onRegisterError() { storageError = 'Offline preparation failed. JSON backup and online editing remain available.'; } });
     void import('./viewport.ts').then(({ createViewport }) => {
       if (disposed) return;
-      try { viewport = createViewport(host); viewport.update(result, { ...view }, theme); }
+      try { viewport = createViewport(host); viewport.update(result, pose, theme); }
       catch { previewError = 'WebGL preview is unavailable. Geometry and STL export still work.'; }
     }).catch(() => { previewError = 'The preview could not load. Geometry and STL export still work.'; });
     controller = new GeometryController(() => new Worker(workerUrl, { type: 'module' }), generated => {
@@ -233,9 +226,9 @@
   });
   $effect(() => {
     const activeResult = result;
-    const options = { ...view };
+    const activePose = pose;
     const activeTheme = theme;
-    viewport?.update(activeResult, options, activeTheme);
+    viewport?.update(activeResult, activePose, activeTheme);
   });
   $effect(() => { if (importCandidate && importDialog && !importDialog.open) importDialog.showModal(); });
 </script>
@@ -264,31 +257,15 @@
             <p class="dimensions" aria-label="Model dimensions">{dimensions.map(value => value.toFixed(1)).join(' × ')} mm</p>
           {/if}
         </div>
+        <div class="pose-toggle" role="group" aria-label="Preview pose">
+          <button aria-pressed={pose === 'assembly'} onclick={() => pose = 'assembly'}>Assembled</button>
+          <button aria-pressed={pose === 'print'} onclick={() => pose = 'print'}>Print pose</button>
+        </div>
       </div>
       <div class="preview-area">
         <div class="viewport" bind:this={host}></div>
-        <details class="view-menu">
-          <summary>View options</summary>
-          <div class="view-options">
-            <div class="camera-actions">
-              <button class="quiet" onclick={() => viewport?.fit(true)}>Front view</button>
-              <button class="quiet" onclick={() => viewport?.fit()}>Fit view</button>
-            </div>
-            <label><input type="checkbox" bind:checked={view.lampVisible} /> Lamp reference</label>
-            <label class="lamp-power"><input type="checkbox" bind:checked={view.lampOn} disabled={view.mode !== 'assembly' || !view.lampVisible} /> Lamp on</label>
-            <label><input type="checkbox" bind:checked={view.keepoutsVisible} /> Access volumes</label>
-            <label class="opacity-control">Lamp opacity<input aria-label="Lamp reference opacity" type="range" min="0.1" max="0.8" step="0.05" bind:value={view.lampOpacity} /></label>
-          </div>
-        </details>
-      </div>
-      {#if !current && result}<span class="stale-badge">Updating preview…</span>{/if}
-      {#if previewError}<p class="preview-error">{previewError}</p>{/if}
-      <div class="preview-controls">
-        <div class="segmented" role="group" aria-label="Preview view">
-          {#each previewViews as { mode, label }}
-            <button aria-pressed={view.mode === mode} onclick={() => view.mode = mode}>{label}</button>
-          {/each}
-        </div>
+        {#if !current && result}<span class="stale-badge">Updating preview…</span>{/if}
+        {#if previewError}<p class="preview-error">{previewError}</p>{/if}
       </div>
     </section>
     <aside aria-label="Parameters" class="settings-panel">

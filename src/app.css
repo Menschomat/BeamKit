@@ -152,51 +152,42 @@ details[open] > summary::after { content: '−' / ''; }
   grid-template-columns: minmax(0, 1fr) clamp(310px, 27vw, 356px);
 }
 .stage { position: relative; display: flex; flex-direction: column; min-width: 0; background: var(--color-canvas); }
-.stage-header { padding: 16px var(--gutter) 0; }
+.stage-header {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 12px var(--gutter) 0;
+}
 .stage-title { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 16px; min-width: 0; }
 h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; letter-spacing: -.035em; }
 .dimensions { color: var(--color-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.preview-area { position: relative; display: flex; flex: 1; min-height: 0; container-type: size; }
+.preview-area { position: relative; display: flex; flex: 1; min-height: 0; }
 .viewport { flex: 1; min-width: 0; min-height: 0; width: 100%; overflow: hidden; }
 .viewport canvas { display: block; touch-action: none; }
 
-.preview-controls { padding: 0 var(--gutter) 16px; }
-.segmented { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
-.segmented button { border-color: transparent; background: transparent; }
-.segmented button[aria-pressed=true] {
-  background: var(--field-surface);
-  border-color: var(--color-line);
-}
-.view-menu { position: absolute; z-index: 2; right: var(--gutter); bottom: 12px; }
-.view-menu > summary {
-  padding: 0 10px;
+.pose-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
   border: 1px solid var(--color-line);
   border-radius: var(--control-radius);
   background: var(--color-surface);
 }
-.view-menu > summary:hover { background: var(--hover-surface); }
-.view-options {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
-  width: min(288px, calc(100vw - 2 * var(--gutter)));
-  max-height: calc(100cqh - var(--control-height) - 28px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 12px 16px;
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  background: var(--color-surface);
-  box-shadow: 0 8px 24px #152d3a24;
+.pose-toggle button {
+  padding: 5px 10px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 13px;
+  white-space: nowrap;
 }
-.camera-actions { display: flex; gap: 8px; }
-.camera-actions button { flex: 1; }
-.view-options label, .check-row { display: flex; align-items: center; min-height: 44px; gap: 8px; cursor: pointer; }
-.lamp-power:has(input:disabled) { color: var(--color-muted); cursor: default; }
-.opacity-control input { min-width: 0; flex: 1; }
+.pose-toggle button[aria-pressed=true] { background: var(--field-surface); border-color: var(--color-line); }
+.check-row { display: flex; align-items: center; min-height: 44px; gap: 8px; cursor: pointer; }
 .stale-badge, .preview-error {
   position: absolute;
-  top: 65px;
+  top: 8px;
   left: var(--gutter);
   right: var(--gutter);
   width: fit-content;
@@ -355,11 +346,25 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
 @media (max-width: 600px) {
   .stage-title { display: block; }
   .dimensions { font-size: 13px; }
-  .preview-area { height: clamp(260px, 40dvh, 400px); }
   .settings-body { display: block; }
-  .segmented { width: 100%; }
-  .segmented button { flex: 1; padding-inline: 4px; font-size: 13px; white-space: nowrap; }
-  .status-bar { align-content: start; }
+}
+@media (max-width: 600px), (max-width: 1000px) and (max-height: 500px) and (orientation: landscape) {
+  html, body { overflow: clip; overscroll-behavior: none; }
+  .app-shell { height: 100dvh; min-height: 0; overflow: clip; }
+  .app-header, .status-bar, .notice { flex: none; }
+  .workspace { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 43fr) minmax(0, 57fr); }
+  .stage, .settings-panel { min-height: 0; }
+  .stage-header { padding-top: 8px; }
+  .preview-area { flex: 1; height: auto; }
+  .settings-panel { max-height: none; padding-block: 4px 8px; }
+  .settings-tabs { margin-bottom: 8px; }
+  .status-bar { min-height: 36px; column-gap: 8px; font-size: 12px; }
+  .status-bar a { min-height: 24px; }
+}
+@media (max-width: 1000px) and (max-height: 500px) and (orientation: landscape) {
+  .workspace { grid-template-columns: minmax(0, 1fr) minmax(280px, 44%); grid-template-rows: minmax(0, 1fr); }
+  .settings-panel { border-top: 0; border-left: 1px solid var(--color-line); }
+  .settings-body { display: block; }
 }
 @media (max-width: 360px) {
   .app-header { gap: 8px; padding-inline: 12px; }

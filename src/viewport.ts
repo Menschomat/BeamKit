@@ -1,7 +1,7 @@
 import {
-  AmbientLight, Box3, BoxGeometry, BufferAttribute, BufferGeometry, Color, DirectionalLight,
-  EdgesGeometry, ExtrudeGeometry, GridHelper, Group, LineBasicMaterial, LineLoop, LineSegments, Mesh,
-  MeshBasicMaterial, MeshStandardMaterial, Path, PerspectiveCamera, Plane, Scene, Shape, ShapeGeometry,
+  AmbientLight, Box3, BufferAttribute, BufferGeometry, Color, DirectionalLight,
+  ExtrudeGeometry, GridHelper, Group, LineBasicMaterial, LineLoop, LineSegments, Mesh,
+  MeshBasicMaterial, MeshStandardMaterial, Path, PerspectiveCamera, Scene, Shape, ShapeGeometry,
   Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -10,16 +10,11 @@ import { lampReferenceLines } from './geometry/lamp-reference.ts';
 import { materialRegions } from './domain/materials.ts';
 import type { AssemblyResult } from './generators/assembly.ts';
 import type { createPanelLighting } from './viewport-lighting.ts';
-export type ViewOptions = {
-  mode: 'assembly' | 'part' | 'section' | 'print';
-  lampVisible: boolean;
-  lampOn: boolean;
-  keepoutsVisible: boolean;
-  lampOpacity: number;
-};
+export type PreviewPose = 'assembly' | 'print';
+
 export function createViewport(host: HTMLElement) {
   const renderer = new WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.localClippingEnabled = true;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   host.append(renderer.domElement);
   const scene = new Scene();
   const background = new Color(getComputedStyle(host).getPropertyValue('--color-canvas').trim());
@@ -33,10 +28,9 @@ export function createViewport(host: HTMLElement) {
   const lamp = new Group();
   const profile = lamps[0];
   const reference = lampReferenceLines(profile);
-  const lines = new LineBasicMaterial({ transparent: true, depthWrite: false });
-  const apertureLine = new LineBasicMaterial({ transparent: true, depthWrite: false });
-  const housingTint = new MeshBasicMaterial({ transparent: true, depthWrite: false });
-  const apertureTint = new MeshBasicMaterial({ transparent: true, depthWrite: false });
+  const lines = new LineBasicMaterial({ transparent: true, opacity: 0.65, depthWrite: false });
+  const apertureLine = new LineBasicMaterial({ transparent: true, opacity: 0.55, depthWrite: false });
+  const housingTint = new MeshBasicMaterial({ transparent: true, opacity: 0.21, depthWrite: false });
   const litAperture = new MeshBasicMaterial({ color: new Color('#fff2db').multiplyScalar(2.6), toneMapped: false });
   const housingDepth = new MeshBasicMaterial({
     transparent: true, colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
@@ -55,7 +49,7 @@ export function createViewport(host: HTMLElement) {
   lamp.add(housingMask);
   const housingMesh = new Mesh(housing, housingTint);
   lamp.add(housingMesh);
-  const apertureMesh = new Mesh(new ShapeGeometry(new Shape(aperture.map(([x, y]) => new Vector2(x, y)))), apertureTint);
+  const apertureMesh = new Mesh(new ShapeGeometry(new Shape(aperture.map(([x, y]) => new Vector2(x, y)))), litAperture);
   apertureMesh.position.z = 0.01;
   apertureMesh.renderOrder = 1;
   lamp.add(apertureMesh);
@@ -98,14 +92,6 @@ export function createViewport(host: HTMLElement) {
   uprights.renderOrder = 2;
   lamp.add(uprights);
   scene.add(lamp);
-  const keepouts = new Group(); const keepoutMaterial = new LineBasicMaterial({ transparent: true, opacity: 0.65 });
-  for (const { bounds } of lamps[0].keepouts) {
-    const dimensions = bounds.max.map((v, i) => v - bounds.min[i]);
-    const cube = new BoxGeometry(...dimensions as [number, number, number]);
-    const line = new LineSegments(new EdgesGeometry(cube), keepoutMaterial); cube.dispose();
-    line.position.set(...bounds.min.map((v, i) => (v + bounds.max[i]) / 2) as [number, number, number]); keepouts.add(line);
-  }
-  keepouts.visible = false; scene.add(keepouts);
   const partGroup = new Group(); scene.add(partGroup);
   const material = new MeshStandardMaterial({ color: '#6c8494', roughness: 0.8, metalness: 0.01, flatShading: true });
   const regionMaterials = {
@@ -114,15 +100,13 @@ export function createViewport(host: HTMLElement) {
     shell: new MeshStandardMaterial({ color: materialRegions.shell.color, roughness: 0.8, flatShading: true }),
   };
   const printMaterials = [material, ...Object.values(regionMaterials)];
-  const cutPlane = new Plane(new Vector3(0, -1, 0), 0);
   let displayed: AssemblyResult | null = null;
   let displayedTheme: 'light' | 'dark' | undefined;
-  let lampOn = false;
   let disposed = false;
   let lightingRequested = false;
   let lighting: ReturnType<typeof createPanelLighting> | undefined;
   const render = () => {
-    if (lampOn && lighting) lighting.render();
+    if (lamp.visible && lighting) lighting.render();
     else renderer.render(scene, camera);
   };
   controls.addEventListener('change', render);
@@ -131,15 +115,13 @@ export function createViewport(host: HTMLElement) {
     renderer.setSize(width, height); lighting?.resize(width, height);
     camera.aspect = width / height; camera.updateProjectionMatrix(); fit();
   }); resize.observe(host);
-  function fit(front = false) {
+  function fit() {
     const bounds = new Box3(); if (lamp.visible) bounds.expandByObject(lamp);
     if (partGroup.children.length) bounds.expandByObject(partGroup);
     if (bounds.isEmpty()) bounds.setFromCenterAndSize(new Vector3(), new Vector3(115, 65, 25));
     const center = bounds.getCenter(new Vector3());
-    const direction = front ? new Vector3(0, 0, 1) : new Vector3(0.38, -0.72, 1.25).normalize();
-    const up = front ? new Vector3(0, 1, 0) : new Vector3(0, 0, 1);
-    camera.up.copy(up);
-    const right = new Vector3().crossVectors(up, direction).normalize();
+    const direction = new Vector3(0.38, -0.72, 1.25).normalize();
+    const right = new Vector3().crossVectors(camera.up, direction).normalize();
     const screenUp = new Vector3().crossVectors(direction, right).normalize();
     const tangent = Math.tan(17 * Math.PI / 180);
     let distance = 30;
@@ -155,8 +137,7 @@ export function createViewport(host: HTMLElement) {
   function clearParts() { for (const mesh of partGroup.children) (mesh as Mesh).geometry.dispose(); partGroup.clear(); }
   fit();
   return {
-    fit,
-    update(result: AssemblyResult | null, options: ViewOptions, theme: 'light' | 'dark') {
+    update(result: AssemblyResult | null, pose: PreviewPose, theme: 'light' | 'dark') {
       if (theme !== displayedTheme) {
         displayedTheme = theme;
         const style = getComputedStyle(host);
@@ -166,13 +147,12 @@ export function createViewport(host: HTMLElement) {
         lines.color.set(color('--preview-outline'));
         housingTint.color.set(color('--preview-housing'));
         apertureLine.color.set(color('--preview-highlight'));
-        apertureTint.color.set(color('--color-accent'));
-        keepoutMaterial.color.copy(apertureLine.color);
       }
-      lamp.visible = options.lampVisible && options.mode === 'assembly';
-      lampOn = lamp.visible && options.lampOn;
-      apertureMesh.material = lampOn ? litAperture : apertureTint;
-      if (lampOn && !lightingRequested) {
+      const printPose = pose === 'print';
+      const showLamp = !printPose;
+      const poseChanged = lamp.visible !== showLamp;
+      lamp.visible = showLamp;
+      if (lamp.visible && !lightingRequested) {
         lightingRequested = true;
         void import('./viewport-lighting.ts').then(({ createPanelLighting }) => {
           if (disposed) return;
@@ -180,23 +160,11 @@ export function createViewport(host: HTMLElement) {
           render();
         }).catch(() => { /* The bright diffuser still renders if the lighting module is unavailable. */ });
       }
-      lines.opacity = options.lampOpacity;
-      apertureLine.opacity = options.lampOpacity * 0.85;
-      housingTint.opacity = options.lampOpacity * 0.32;
-      apertureTint.opacity = options.lampOpacity * 0.2;
-      keepouts.visible = options.keepoutsVisible && options.mode !== 'print';
-      partGroup.rotation.x = options.mode === 'print' ? Math.PI : 0;
-      partGroup.position.z = options.mode === 'print' ? Math.max(...(result?.parts.map(part => part.bounds.max[2]) ?? [0])) : 0;
-      floor.position.z = options.mode === 'print' ? -0.05 : -16;
-      const sectionActive = options.mode === 'section';
-      if (sectionActive !== Boolean(material.clippingPlanes?.length)) {
-        for (const printMaterial of printMaterials) {
-          printMaterial.clippingPlanes = sectionActive ? [cutPlane] : [];
-          printMaterial.needsUpdate = true;
-        }
-      }
+      partGroup.rotation.x = printPose ? Math.PI : 0;
+      partGroup.position.z = printPose && result?.parts.length ? Math.max(...result.parts.map(part => part.bounds.max[2])) : 0;
+      floor.position.z = printPose ? -0.05 : -16;
+      const firstGeometry = displayed === null && result !== null;
       if (displayed !== result) {
-        const firstGeometry = displayed === null && result !== null;
         clearParts(); displayed = result;
         for (const [index, part] of (result?.regions ?? result?.parts ?? []).entries()) {
           const geometry = new BufferGeometry(); geometry.setAttribute('position', new BufferAttribute(part.mesh.positions, 3));
@@ -206,9 +174,9 @@ export function createViewport(host: HTMLElement) {
           mesh.position.set(...part.transform);
           partGroup.add(mesh);
         }
-        if (firstGeometry) fit();
       }
-      render();
+      if (firstGeometry || poseChanged) fit();
+      else render();
     },
     dispose() {
       disposed = true;
@@ -216,8 +184,7 @@ export function createViewport(host: HTMLElement) {
       resize.disconnect(); controls.dispose(); clearParts(); printMaterials.forEach(printMaterial => printMaterial.dispose());
       const referenceGeometries = new Set(lamp.children.map(object => (object as Mesh | LineLoop | LineSegments).geometry));
       referenceGeometries.forEach(geometry => geometry.dispose());
-      for (const material of [lines, apertureLine, housingTint, apertureTint, litAperture, housingDepth]) material.dispose();
-      keepouts.children.forEach(line => (line as LineSegments).geometry.dispose()); keepoutMaterial.dispose();
+      for (const material of [lines, apertureLine, housingTint, litAperture, housingDepth]) material.dispose();
       floor.geometry.dispose(); floor.material.dispose(); renderer.dispose(); renderer.domElement.remove();
     },
   };

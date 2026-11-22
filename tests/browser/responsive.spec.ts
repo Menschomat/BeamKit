@@ -8,23 +8,13 @@ for (const width of [320, 390, 640, 768, 900, 1024, 1440]) {
     await expect(page.locator('.viewport canvas')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     expect(overflow).toBeLessThanOrEqual(1);
-    const stage = page.locator('.stage');
     const view = page.locator('.viewport');
     const bounds = await view.boundingBox();
     expect(bounds!.width).toBeGreaterThan(250);
     expect(bounds!.height).toBeGreaterThanOrEqual(200);
-    const viewOptions = page.getByText('View options', { exact: true });
-    const toggle = (await viewOptions.boundingBox())!;
-    expect(bounds!.x + bounds!.width - (toggle.x + toggle.width)).toBeGreaterThan(0);
-    const bottomGap = bounds!.y + bounds!.height - (toggle.y + toggle.height);
-    expect(bottomGap).toBeGreaterThan(0);
-    expect(bottomGap).toBeLessThanOrEqual(16);
-    await viewOptions.click();
-    const menu = (await page.locator('.view-options').boundingBox())!;
-    expect(menu.x).toBeGreaterThanOrEqual(bounds!.x);
-    expect(menu.y).toBeGreaterThanOrEqual(bounds!.y);
-    expect(menu.y + menu.height).toBeLessThan(toggle.y);
-    await viewOptions.click();
+    const pose = page.getByRole('group', { name: 'Preview pose' });
+    const toggle = (await pose.boundingBox())!;
+    expect(toggle.y + toggle.height).toBeLessThanOrEqual(bounds!.y);
 
     await expect(page.getByRole('button', { name: 'Parameters', exact: true })).toHaveCount(0);
     const panel = page.getByRole('complementary', { name: 'Parameters' });
@@ -37,9 +27,6 @@ for (const width of [320, 390, 640, 768, 900, 1024, 1440]) {
       await expect(orientation).toBeVisible();
       await orientation.fill('30');
       await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
-      await stage.scrollIntoViewIfNeeded();
-      await page.getByRole('button', { name: 'Print pose', exact: true }).click();
-      await expect(page.getByRole('button', { name: 'Print pose', exact: true })).toHaveAttribute('aria-pressed', 'true');
     } else {
       expect(await panel.locator('.settings-scroll').evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
       await orientation.scrollIntoViewIfNeeded();
@@ -64,9 +51,9 @@ test('the header fits at 320px with wider font metrics', async ({ page }) => {
   }
 });
 
-for (const width of [390, 1024]) {
-  test(`parameter tabs and attachment selector stay fixed at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 650 });
+for (const { width, height } of [{ width: 320, height: 568 }, { width: 390, height: 650 }, { width: 844, height: 390 }, { width: 1024, height: 650 }]) {
+  test(`parameter tabs and attachment selector stay fixed at ${width}×${height}`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
     const panel = page.getByRole('complementary', { name: 'Parameters' });
@@ -75,14 +62,22 @@ for (const width of [390, 1024]) {
     const tabs = panel.getByRole('group', { name: 'Parameter groups' });
     const attachment = panel.getByLabel('Attachment type', { exact: true });
     const sliders = panel.locator('.settings-scroll');
+    const canvas = page.locator('.viewport canvas');
+    const initialPreview = await canvas.boundingBox();
     const tabTop = (await tabs.boundingBox())!.y;
     const selectorTop = (await attachment.boundingBox())!.y;
-    expect(await sliders.evaluate(element => {
-      element.scrollTop = element.scrollHeight;
-      return element.scrollTop;
-    })).toBeGreaterThan(0);
+    await sliders.hover();
+    await page.mouse.wheel(0, 1600);
+    await expect.poll(() => sliders.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+    await expect(panel.getByRole('button', { name: 'Reset preset' })).toBeInViewport({ ratio: 1 });
     expect((await tabs.boundingBox())!.y).toBe(tabTop);
     expect((await attachment.boundingBox())!.y).toBe(selectorTop);
+    expect(await canvas.boundingBox()).toEqual(initialPreview);
+    expect(await page.evaluate(() => {
+      window.scrollTo(0, 1000);
+      return { scrollY: window.scrollY, overflow: document.documentElement.scrollHeight - window.innerHeight };
+    })).toEqual({ scrollY: 0, overflow: 0 });
+    await expect(page.getByRole('contentinfo')).toBeInViewport({ ratio: 1 });
     await tabs.getByRole('button', { name: 'Fit', exact: true }).click();
     await expect(panel.getByRole('spinbutton', { name: 'Fit clearance per side', exact: true })).toBeInViewport();
     expect(await sliders.evaluate(element => element.scrollTop)).toBe(0);

@@ -18,8 +18,10 @@ and focus, readable contrast, and responsive inspection of the actual product.
 
 The desktop preview sits beside the parameters panel. The parameter tabs stay
 visible while controls scroll. The header holds the project tools and export
-action. On phones the parameters sit below the preview, with touch orbit controls
-and a floating View options menu in the preview.
+action. The toggle above the preview switches between the lit assembly and the
+accessory on the print bed. On phones the editor fits within the viewport and
+only the parameter fields scroll. The panels stack in portrait and sit side by
+side in short landscape windows.
 
 No external fonts, photographs, source product images, meshes, third-party logos,
 or textures are needed. All runtime assets remain available offline.

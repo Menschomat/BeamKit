@@ -1,26 +1,24 @@
 import { test, expect } from '@playwright/test';
 
-test('the assembled preview starts lit and the lamp can be toggled', async ({ page }) => {
+test('the preview switches between the lit assembly and print pose', async ({ page }) => {
   await page.goto('/');
   const export3mf = page.getByRole('button', { name: 'Export 3MF', exact: true });
   await expect(export3mf).toBeEnabled();
   const canvas = page.locator('.viewport canvas');
   await expect(canvas).toBeVisible();
-  await page.getByText('View options', { exact: true }).click();
-  await page.getByRole('button', { name: 'Front view', exact: true }).click();
-  const lampOn = page.getByRole('checkbox', { name: 'Lamp on', exact: true });
-  await expect(lampOn).toBeChecked();
-  await lampOn.uncheck();
-  const unlit = await canvas.screenshot();
-  await lampOn.check();
-  expect((await canvas.screenshot()).equals(unlit)).toBe(false);
+  const toggle = page.getByRole('group', { name: 'Preview pose' });
+  const assembled = toggle.getByRole('button', { name: 'Assembled' });
+  const printPose = toggle.getByRole('button', { name: 'Print pose' });
+  await expect(toggle.getByRole('button')).toHaveCount(2);
+  await expect(assembled).toHaveAttribute('aria-pressed', 'true');
+  const assembledPreview = await canvas.screenshot();
+  await printPose.click();
+  await expect(printPose).toHaveAttribute('aria-pressed', 'true');
+  expect((await canvas.screenshot()).equals(assembledPreview)).toBe(false);
   await expect(export3mf).toBeEnabled();
-  await page.getByRole('checkbox', { name: 'Lamp reference', exact: true }).uncheck();
-  await expect(lampOn).toBeDisabled();
-  await page.getByRole('checkbox', { name: 'Lamp reference', exact: true }).check();
-  await expect(lampOn).toBeChecked();
-  await page.getByRole('button', { name: 'Part only', exact: true }).click();
-  await expect(lampOn).toBeDisabled();
+  await assembled.click();
+  await expect(assembled).toHaveAttribute('aria-pressed', 'true');
+  await expect(printPose).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('theme follows the system until overridden and remembers the choice', async ({ page }) => {
@@ -99,10 +97,7 @@ test('integrated design, JSON confirmation, history, fit test, holder, and offli
   await attachment.selectOption('diffusion-sheet-holder');
   await expect(page.getByRole('spinbutton', { name: 'Sheet thickness', exact: true })).toBeVisible(); await expect(exportStl).toBeEnabled();
   const holderDownload = page.waitForEvent('download'); await exportStl.click(); expect((await holderDownload).suggestedFilename()).toBe('p96l-diffusion-sheet-holder.stl');
-  await page.getByRole('button', { name: 'Section', exact: true }).click();
-  await page.getByText('View options', { exact: true }).click();
-  await page.getByRole('checkbox', { name: 'Access volumes', exact: true }).check();
-  await page.getByText('View options', { exact: true }).click();
+  await page.getByRole('button', { name: 'Print pose', exact: true }).click();
   await attachment.selectOption('honeycomb'); await depth.fill('18');
   await expect(exportStl).toBeEnabled(); await expect(page.getByRole('status')).toContainText('Offline ready'); await expect(page.getByRole('status')).toContainText('Saved locally');
   await context.setOffline(true); await page.reload(); await expect(depth).toHaveValue('18'); await expect(exportStl).toBeEnabled();
