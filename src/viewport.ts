@@ -5,8 +5,8 @@ import {
   Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { lamps } from './catalog/registry.ts';
-import { lampReferenceLines } from './geometry/lamp-reference.ts';
+import type { LampDefinition } from './domain/definitions.ts';
+import { lampApertureZ, lampReferenceLines } from './geometry/lamp-reference.ts';
 import { materialRegions } from './domain/materials.ts';
 import type { AssemblyResult } from './generators/assembly.ts';
 import type { createPanelLighting } from './viewport-lighting.ts';
@@ -26,8 +26,6 @@ export function createViewport(host: HTMLElement) {
   const light = new DirectionalLight(0xffffff, 1.85); light.position.set(-40, -90, 180); scene.add(light);
   const rim = new DirectionalLight(0xffffff, 0.6); rim.position.set(60, 40, 30); scene.add(rim);
   const lamp = new Group();
-  const profile = lamps[0];
-  const reference = lampReferenceLines(profile);
   const lines = new LineBasicMaterial({ transparent: true, opacity: 0.65, depthWrite: false });
   const apertureLine = new LineBasicMaterial({ transparent: true, opacity: 0.55, depthWrite: false });
   const housingTint = new MeshBasicMaterial({ transparent: true, opacity: 0.21, depthWrite: false });
@@ -36,61 +34,86 @@ export function createViewport(host: HTMLElement) {
     transparent: true, colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
   });
 
-  // Use the procedural reference contours for the translucent viewport surfaces.
-  const [front, , rearSeam, aperture, ...markers] = reference.loops;
-  const housing = new ExtrudeGeometry(new Shape(front.map(([x, y]) => new Vector2(x, y))), {
-    depth: profile.body.depth, bevelEnabled: false,
-  });
-  housing.translate(0, 0, -profile.body.depth);
-  // Write the visible housing depth before drawing the tinted surfaces and outlines.
-  // This keeps back-side lines from showing through the controls.
-  const housingMask = new Mesh(housing, housingDepth);
-  housingMask.renderOrder = -1;
-  lamp.add(housingMask);
-  const housingMesh = new Mesh(housing, housingTint);
-  lamp.add(housingMesh);
-  const apertureMesh = new Mesh(new ShapeGeometry(new Shape(aperture.map(([x, y]) => new Vector2(x, y)))), litAperture);
-  apertureMesh.position.z = 0.01;
-  apertureMesh.renderOrder = 1;
-  lamp.add(apertureMesh);
-  const bay = profile.detail.leftControlBay;
-  const bayPlane = bay ? -profile.body.width / 2 + bay.insetMm : undefined;
-  const seamSegments = rearSeam.flatMap((point, i) => {
-    const next = rearSeam[(i + 1) % rearSeam.length];
-    return point[0] === bayPlane && next[0] === bayPlane ? [] : [point, next];
-  });
-  const seam = new LineSegments(new BufferGeometry().setFromPoints(seamSegments.map(p => new Vector3(...p))), lines);
-  seam.renderOrder = 2;
-  lamp.add(seam);
+  function clearLamp() {
+    const geometries = new Set(lamp.children.map(object => (object as Mesh | LineLoop | LineSegments).geometry));
+    geometries.forEach(geometry => geometry.dispose());
+    lamp.clear();
+  }
+
   function addOutline(points: Vector3[], material: LineBasicMaterial) {
     const outline = new LineLoop(new BufferGeometry().setFromPoints(points), material);
     outline.renderOrder = 2;
     lamp.add(outline);
   }
-  for (const [i, loop] of [front, reference.loops[1], aperture, ...markers].entries()) {
-    // Project the measured opening outlines onto the visible bay wall instead of drawing
-    // them behind the simplified housing surface.
-    const markerPlane = bayPlane !== undefined && i >= 3 && profile.detail.markers[i - 3].side === 'left-edge'
-      ? bayPlane - 0.01 : undefined;
-    addOutline(loop.map(([x, y, z]) => new Vector3(markerPlane ?? x, y, z)),
-      loop === aperture ? apertureLine : lines);
+
+  function buildLamp(profile: LampDefinition) {
+    const reference = lampReferenceLines(profile);
+    const section = profile.detail.crossSection;
+    // Use the procedural contours for the translucent viewport surfaces.
+    const [front, , rearSeam, aperture, ...markers] = reference.loops;
+    const housing = new ExtrudeGeometry(new Shape(section
+      ? section.map(([y, z]) => new Vector2(y, z))
+      : front.map(([x, y]) => new Vector2(x, y))), {
+      depth: section ? profile.body.width : profile.body.depth, bevelEnabled: false,
+    });
+    if (section) housing.rotateX(Math.PI / 2).rotateZ(Math.PI / 2).translate(-profile.body.width / 2, 0, 0);
+    else housing.translate(0, 0, -profile.body.depth);
+    // Write the visible housing depth before drawing the tinted surfaces and outlines.
+    // This keeps back-side lines from showing through the controls.
+    const housingMask = new Mesh(housing, housingDepth);
+    housingMask.renderOrder = -1;
+    lamp.add(housingMask);
+    const housingMesh = new Mesh(housing, housingTint);
+    lamp.add(housingMesh);
+    const apertureMesh = new Mesh(profile.detail.apertureEdgeDepth
+      ? curvedAperture(profile)
+      : new ShapeGeometry(new Shape(aperture.map(([x, y]) => new Vector2(x, y)))), litAperture);
+    apertureMesh.position.z = 0.01;
+    apertureMesh.renderOrder = 1;
+    lamp.add(apertureMesh);
+    if (section) {
+      const halfLength = profile.body.width / 2;
+      for (const x of [-halfLength - 0.01, -halfLength + 2, halfLength - 2, halfLength + 0.01]) {
+        addOutline(section.map(([y, z]) => new Vector3(x, y, z)), lines);
+      }
+      addOutline(aperture.map(([x, y, z]) => new Vector3(x, y, z + 0.02)), apertureLine);
+      for (const loop of markers) addOutline(loop.map(point => new Vector3(...point)), lines);
+      return;
+    }
+    const bay = profile.detail.leftControlBay;
+    const bayPlane = bay ? -profile.body.width / 2 + bay.insetMm : undefined;
+    const seamSegments = rearSeam.flatMap((point, i) => {
+      const next = rearSeam[(i + 1) % rearSeam.length];
+      return point[0] === bayPlane && next[0] === bayPlane ? [] : [point, next];
+    });
+    const seam = new LineSegments(new BufferGeometry().setFromPoints(seamSegments.map(p => new Vector3(...p))), lines);
+    seam.renderOrder = 2;
+    lamp.add(seam);
+    for (const [i, loop] of [front, reference.loops[1], aperture, ...markers].entries()) {
+      // Project the measured opening outlines onto the visible bay wall instead of drawing
+      // them behind the simplified housing surface.
+      const markerPlane = bayPlane !== undefined && i >= 3 && profile.detail.markers[i - 3]?.side === 'left-edge'
+        ? bayPlane - 0.01 : undefined;
+      addOutline(loop.map(([x, y, z]) => new Vector3(markerPlane ?? x, y, z)),
+        loop === aperture ? apertureLine : lines);
+    }
+    if (reference.mountingSeat) {
+      const { outline, opening } = reference.mountingSeat;
+      const toFace = ([x, , z]: [number, number, number]) => new Vector2(x, z);
+      const shape = new Shape(outline.map(toFace));
+      shape.holes.push(new Path(opening.map(toFace)));
+      const seat = new Mesh(new ShapeGeometry(shape), housingTint);
+      seat.rotation.x = Math.PI / 2;
+      seat.position.y = outline[0][1];
+      seat.renderOrder = 1;
+      lamp.add(seat);
+      addOutline(outline.map(point => new Vector3(...point)), lines);
+      addOutline(opening.map(point => new Vector3(...point)), apertureLine);
+    }
+    const uprights = new LineSegments(new BufferGeometry().setFromPoints(reference.segments.map(p => new Vector3(...p))), lines);
+    uprights.renderOrder = 2;
+    lamp.add(uprights);
   }
-  if (reference.mountingSeat) {
-    const { outline, opening } = reference.mountingSeat;
-    const toFace = ([x, , z]: [number, number, number]) => new Vector2(x, z);
-    const shape = new Shape(outline.map(toFace));
-    shape.holes.push(new Path(opening.map(toFace)));
-    const seat = new Mesh(new ShapeGeometry(shape), housingTint);
-    seat.rotation.x = Math.PI / 2;
-    seat.position.y = outline[0][1];
-    seat.renderOrder = 1;
-    lamp.add(seat);
-    addOutline(outline.map(point => new Vector3(...point)), lines);
-    addOutline(opening.map(point => new Vector3(...point)), apertureLine);
-  }
-  const uprights = new LineSegments(new BufferGeometry().setFromPoints(reference.segments.map(p => new Vector3(...p))), lines);
-  uprights.renderOrder = 2;
-  lamp.add(uprights);
   scene.add(lamp);
   const partGroup = new Group(); scene.add(partGroup);
   const material = new MeshStandardMaterial({ color: '#6c8494', roughness: 0.8, metalness: 0.01, flatShading: true });
@@ -102,6 +125,7 @@ export function createViewport(host: HTMLElement) {
   const printMaterials = [material, ...Object.values(regionMaterials)];
   let displayed: AssemblyResult | null = null;
   let displayedTheme: 'light' | 'dark' | undefined;
+  let profile: LampDefinition | undefined;
   let disposed = false;
   let cameraInteracted = false;
   let lightingRequested = false;
@@ -144,7 +168,7 @@ export function createViewport(host: HTMLElement) {
   resizeViewport();
   fit();
   return {
-    update(result: AssemblyResult | null, pose: PreviewPose, theme: 'light' | 'dark') {
+    update(result: AssemblyResult | null, pose: PreviewPose, theme: 'light' | 'dark', selectedLamp: LampDefinition) {
       if (theme !== displayedTheme) {
         displayedTheme = theme;
         const style = getComputedStyle(host);
@@ -158,18 +182,28 @@ export function createViewport(host: HTMLElement) {
       const printPose = pose === 'print';
       const showLamp = !printPose;
       const poseChanged = lamp.visible !== showLamp;
+      const lampChanged = selectedLamp !== profile;
+      if (lampChanged) {
+        clearLamp();
+        buildLamp(selectedLamp);
+        profile = selectedLamp;
+        cameraInteracted = false;
+        lighting?.dispose();
+        lighting = undefined;
+        lightingRequested = false;
+      }
       lamp.visible = showLamp;
       if (lamp.visible && !lightingRequested) {
         lightingRequested = true;
         void import('./viewport-lighting.ts').then(({ createPanelLighting }) => {
-          if (disposed) return;
-          lighting = createPanelLighting(renderer, scene, camera, profile.aperture);
+          if (disposed || profile !== selectedLamp || lighting) return;
+          lighting = createPanelLighting(renderer, scene, camera, selectedLamp.aperture);
           render();
         }).catch(() => { /* The bright diffuser still renders if the lighting module is unavailable. */ });
       }
       partGroup.rotation.x = printPose ? Math.PI : 0;
       partGroup.position.z = printPose && result?.parts.length ? Math.max(...result.parts.map(part => part.bounds.max[2])) : 0;
-      floor.position.z = printPose ? -0.05 : -16;
+      floor.position.z = printPose ? -0.05 : Math.min(-16, -selectedLamp.body.depth - 4.5);
       const firstGeometry = displayed === null && result !== null;
       if (displayed !== result) {
         clearParts(); displayed = result;
@@ -182,17 +216,37 @@ export function createViewport(host: HTMLElement) {
           partGroup.add(mesh);
         }
       }
-      if (poseChanged || (firstGeometry && !cameraInteracted)) fit();
+      if (lampChanged || poseChanged || (firstGeometry && !cameraInteracted)) fit();
       else render();
     },
     dispose() {
       disposed = true;
       lighting?.dispose();
       resize.disconnect(); controls.dispose(); clearParts(); printMaterials.forEach(printMaterial => printMaterial.dispose());
-      const referenceGeometries = new Set(lamp.children.map(object => (object as Mesh | LineLoop | LineSegments).geometry));
-      referenceGeometries.forEach(geometry => geometry.dispose());
+      clearLamp();
       for (const material of [lines, apertureLine, housingTint, litAperture, housingDepth]) material.dispose();
       floor.geometry.dispose(); floor.material.dispose(); renderer.dispose(); renderer.domElement.remove();
     },
   };
+}
+
+function curvedAperture({ aperture, detail }: LampDefinition) {
+  const { width, height, radius } = aperture;
+  const edgeDepth = detail.apertureEdgeDepth ?? 0;
+  const positions: number[] = [], indices: number[] = [];
+  for (let row = 0; row <= 32; row++) {
+    const y = height * (row / 32 - 0.5);
+    const cornerY = Math.max(0, Math.abs(y) - (height / 2 - radius));
+    const x = width / 2 - radius + Math.sqrt(Math.max(0, radius ** 2 - cornerY ** 2));
+    const z = lampApertureZ(y, height, edgeDepth);
+    positions.push(-x, y, z, x, y, z);
+    if (row > 0) {
+      const i = row * 2;
+      indices.push(i - 2, i - 1, i, i - 1, i + 1, i);
+    }
+  }
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
+  geometry.setIndex(indices);
+  return geometry;
 }

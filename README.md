@@ -1,7 +1,8 @@
 # BeamKit
 
-Design printable SmallRig P96L accessories in your browser. Use **Attachment
-type** to choose a honeycomb, square or rectangular eggcrate, parallel louvers,
+Design printable SmallRig P96L and [Neewer TL21C](docs/TL21C_MEASUREMENTS.md)
+accessories in your browser. Choose the model under **Project → Lamp**. Use
+**Attachment type** to choose a honeycomb, square or rectangular eggcrate, parallel louvers,
 or a diffusion sheet holder. Adjust the geometry and export a 3MF or STL in
 millimetres. The current presets place the front face on the print
 bed. Use **Print → Output → Fit coupon only** to test fit with a smaller print.

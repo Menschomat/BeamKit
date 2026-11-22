@@ -1,0 +1,32 @@
+# Neewer TL21C prototype
+
+The [Neewer TL21C product page](https://neewer.com/collections/all-product/products/neewer-tl21c-rgb-magnetic-light-wand-with-app-control-66604585)
+lists an overall envelope of 228 × 40 × 45 mm, a USB-C port, rear controls, and
+1/4-inch threads on both ends. The two product photos show a curved diffuser and
+a flat rear control face. The photos establish feature layout. The display,
+button, USB-C and screw positions in the preview are schematic.
+
+The local lightformer STL is a measurement reference only. Assuming millimetres,
+its outer bounds are about 50.18 × 80 × 235 mm and represent the accessory.
+Sections through its end retainers suggest a cavity roughly 42.4 mm across the
+widest part and roughly 38.9 mm across around 35 mm behind the diffuser apex.
+The cavity includes unknown allowance for the original design. BeamKit models
+an estimated 41.6 mm shoulder, 45 mm depth and a 218 × 35 mm projected emitting
+area. These dimensions and the approximately 6.5 mm diffuser sag still need
+measurements on the actual lamp. The model and photos stay in the Git-ignored
+`etc/` directory. BeamKit uses only original geometry and exports the accessory.
+
+The part clips over the front with a pair of tapered tabs on each long side.
+Its side skirts limit spill near the lens. The center of the back and both
+threaded end faces stay open. The default honeycomb is about 221.2 × 46.3 × 52 mm.
+Allow for the full length and any brim on the slicer's usable bed. The fit
+coupon is about 19.2 × 46.3 × 42.4 mm and uses the same side clip cross-section.
+Both are oriented grille or rim down in the front-down export.
+
+In BeamKit, choose **Project → Lamp → Neewer TL21C**. Choose **Print → Fit coupon
+only**, print it with the intended material and a 0.4 mm nozzle, and try it across
+the unpowered lamp. Check clip insertion, release and retention, clearance at
+the diffuser, and access with a USB-C cable and end-mounted plate fitted.
+Measure the widest shoulder, the width and front-to-back position where the
+clips catch, and the diffuser projection if the coupon needs adjustment. Check
+thermal and optical behavior separately before using the full accessory.

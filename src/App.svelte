@@ -5,8 +5,8 @@
   import { registerSW } from 'virtual:pwa-register';
   import ParameterField from './app/ParameterField.svelte';
   import { isGridPattern } from './catalog/grid-patterns.ts';
-  import { attachments, lamps, mounts, resolveDefinition } from './catalog/registry.ts';
-  import { attachmentDefinition, createDesign, decodeDesign, encodeDesign, printDiagnostics, supportsMulticolor, validateDesign } from './domain/project.ts';
+  import { attachments, lamps, resolveDefinition } from './catalog/registry.ts';
+  import { attachmentDefinition, createDesign, decodeDesign, defaultMountForLamp, encodeDesign, mountDefinition, printDiagnostics, supportsMulticolor, validateDesign } from './domain/project.ts';
   import type { Design } from './domain/project.ts';
   import { orientFrontDown } from './geometry/printability.ts';
   import { multicolor3mf } from './export-3mf.ts';
@@ -52,12 +52,14 @@
   let revision = 0, previewRevisionFloor = 0, saveRevision = 0, disposed = false;
   let saveTimer: ReturnType<typeof setTimeout>;
   const selectedLamp = $derived(resolveDefinition(lamps, project.lamp));
-  const selectedMount = $derived(project.mount ? resolveDefinition(mounts, project.mount) : null);
+  const selectedMount = $derived(project.mount ? mountDefinition(project.mount) : null);
+  const exportPrefix = $derived(selectedLamp.id.split('.').at(-1));
   const definition = $derived(attachmentDefinition(project));
+  const previewResult = $derived(result?.lampId === selectedLamp.id ? result : null);
   const multicolorAvailable = $derived(supportsMulticolor(project));
   const multicolor = $derived(project.export.format === '3mf');
   const diagnostics = $derived(result && current ? result.diagnostics : printDiagnostics(project));
-  const dimensions = $derived(result?.parts[0] ? result.parts[0].bounds.max.map((v, i) => v - result!.parts[0].bounds.min[i]) : null);
+  const dimensions = $derived(previewResult?.parts[0] ? previewResult.parts[0].bounds.max.map((v, i) => v - previewResult!.parts[0].bounds.min[i]) : null);
   const settingsTabs = [
     { id: 'attachment', label: 'Attachment' },
     { id: 'mount', label: 'Fit' },
@@ -96,16 +98,13 @@
       for (const key of ['depth', 'wall', 'frame', 'inset']) parameters[key] = project.attachment.parameters[key];
     }
     project.attachment = { id, revision: entry.revision, parameters };
-    if (!project.mount && selectedLamp.mounts.length) {
-      const mount = mounts.find(entry => selectedLamp.mounts.includes(entry.id))!;
-      project.mount = { id: mount.id, revision: mount.revision, parameters: { ...mount.defaults } };
-    }
+    if (!project.mount) project.mount = defaultMountForLamp(selectedLamp);
     if (!supportsMulticolor(project)) project.export.format = 'stl';
     project.name = `${selectedLamp.label} ${entry.label.toLowerCase()}`; rebuild();
   }
   function changeMode(mode: Design['assembly']['mode']) {
     remember(); project.assembly.mode = mode;
-    if (mode !== 'standalone' && !project.mount) project.mount = createDesign().mount;
+    if (mode !== 'standalone' && !project.mount) project.mount = defaultMountForLamp(selectedLamp);
     if (!supportsMulticolor(project)) project.export.format = 'stl';
     rebuild();
   }
@@ -123,7 +122,7 @@
     const stack = direction === 'undo' ? undoStack : redoStack, snapshot = stack.at(-1); if (!snapshot) return;
     if (direction === 'undo') { redoStack = [...redoStack, JSON.stringify(project)]; undoStack = stack.slice(0, -1); }
     else { undoStack = [...undoStack, JSON.stringify(project)]; redoStack = stack.slice(0, -1); }
-    project = JSON.parse(snapshot); rebuild();
+    project = JSON.parse(snapshot); localName = project.name; rebuild();
   }
   function resetPreset() {
     const next = structuredClone($state.snapshot(project));
@@ -133,10 +132,12 @@
   }
   function changeLamp(id: string) {
     const lamp = lamps.find(entry => entry.id === id)!;
-    const mount = mounts.find(entry => lamp.mounts.includes(entry.id));
+    const mount = defaultMountForLamp(lamp);
     if (!mount) { error = 'No supported mount is registered for this lamp.'; return; }
     remember(); project.lamp = { id: lamp.id, revision: lamp.revision };
-    project.mount = { id: mount.id, revision: mount.revision, parameters: { ...mount.defaults } };
+    project.mount = mount;
+    project.name = `${lamp.label} ${definition.label.toLowerCase()}`;
+    localName = project.name;
     rebuild();
   }
   async function importProject() {
@@ -150,7 +151,7 @@
   }
   function confirmImport() { if (importCandidate) { replace($state.snapshot(importCandidate)); importCandidate = null; } }
   function saveJson() {
-    try { download('p96l-accessory.json', new Blob([encodeDesign($state.snapshot(project))], { type: 'application/json' })); }
+    try { download(`${exportPrefix}-accessory.json`, new Blob([encodeDesign($state.snapshot(project))], { type: 'application/json' })); }
     catch (cause) { error = (cause as Error).message; }
   }
   function exportParts() {
@@ -164,7 +165,7 @@
   }
   function saveBundle() {
     if (!current || !result || result.projectRevision !== revision) return;
-    download('p96l-accessory.zip', new Blob([exportBundle($state.snapshot(project), result)], { type: 'application/zip' }));
+    download(`${exportPrefix}-accessory.zip`, new Blob([exportBundle($state.snapshot(project), result)], { type: 'application/zip' }));
   }
   async function saveNamed() {
     try {
@@ -203,7 +204,10 @@
     applyUpdate = registerSW({ onOfflineReady() { refreshReadiness(); }, onNeedRefresh() { updateReady = true; }, onRegisterError() { storageError = 'Offline preparation failed. JSON backup and online editing remain available.'; } });
     void import('./viewport.ts').then(({ createViewport }) => {
       if (disposed) return;
-      try { viewport = createViewport(host); viewport.update(result, pose, theme); }
+      try {
+        viewport = createViewport(host);
+        viewport.update(previewResult, pose, theme, selectedLamp);
+      }
       catch { previewError = 'WebGL preview is unavailable. Geometry and STL export still work.'; }
     }).catch(() => { previewError = 'The preview could not load. Geometry and STL export still work.'; });
     controller = new GeometryController(() => new Worker(workerUrl, { type: 'module' }), generated => {
@@ -229,10 +233,11 @@
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', surface);
   });
   $effect(() => {
-    const activeResult = result;
+    const activeResult = previewResult;
     const activePose = pose;
     const activeTheme = theme;
-    viewport?.update(activeResult, activePose, activeTheme);
+    const lamp = selectedLamp;
+    viewport?.update(activeResult, activePose, activeTheme, lamp);
   });
   $effect(() => { if (importCandidate && importDialog && !importDialog.open) importDialog.showModal(); });
 </script>

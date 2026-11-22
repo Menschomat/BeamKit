@@ -41,7 +41,7 @@ manifold parts at the same dimensions and bed position as the honeycomb.
 | Editor | Parametric integrated geometry, local history, responsive panels, section and print views, and validated STL and ZIP downloads. The private CAD files are ignored and excluded from built assets. |
 | Physical fit and modular connection | Actual fit, click force, retention, fatigue, heat and optics require hardware. Modular output remains gated on tested mechanical fit. |
 | Offline | Chromium workflow, full restart and two production builds with a prompted update. Core WebKit workflows are covered. Native Safari installation and platform storage eviction remain to be checked. |
-| Expansion | A second attachment and synthetic lamp fixture exercise the geometry. A second independently measured lamp is deferred. |
+| Expansion | The [Neewer TL21C prototype](TL21C_MEASUREMENTS.md) adds a second real lamp profile and mount strategy. Preview, geometry and exports are tested. Independent lamp measurements and physical fit checks are pending. |
 | Release | CI, build asset checks and Cloudflare Pages preparation are in place. Deployed-origin checks require an authorized deployment. |
 
 The authorized dependency audit reported three moderate entries in the Workbox

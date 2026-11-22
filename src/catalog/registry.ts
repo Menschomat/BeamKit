@@ -1,5 +1,6 @@
 import { extraGridPatterns } from './grid-patterns.ts';
 import { p96l } from './p96l.ts';
+import { tl21c, tl21cSideClips } from './tl21c.ts';
 import type { AttachmentDefinition, ConnectionDefinition, Field, LampDefinition, MountDefinition } from '../domain/definitions.ts';
 import { gridFields } from '../geometry/profile.ts';
 
@@ -26,7 +27,7 @@ const squareRecessMount: MountDefinition = {
   ...cornerMount, revision: 6, fields: mountFields,
   defaults: { ...cornerMount.defaults, plateClearanceWidthMm: 72 },
 };
-export const mounts: readonly MountDefinition[] = [{ ...squareRecessMount, revision: 7 }];
+export const mounts: readonly MountDefinition[] = [{ ...squareRecessMount, revision: 7 }, tl21cSideClips];
 export const attachments: readonly AttachmentDefinition[] = [
   { id: 'honeycomb', revision: 3, label: 'Honeycomb', description: 'Restricts spill with open hexagonal cells.',
     fields: [...gridFields.map(field => ({ ...field, ...(field.key === 'depth' ? { min: 4.8 } : field.key === 'frame' ? { min: 1.6 } : {}), unit: 'mm' as const })),
@@ -58,7 +59,7 @@ export const lamps: readonly LampDefinition[] = [{ ...p96l,
     { id: 'switch-and-button-access', bounds: { min: [-44, 25, -14], max: [-14, 50, 0.4] }, confidence: 'provisional' },
     { id: 'dial-finger-access', bounds: { min: [-75, -24, -14], max: [-50, 24, 0.4] }, confidence: 'provisional' },
   ],
-}];
+}, tl21c];
 export const connections: readonly ConnectionDefinition[] = [{
   id: 'rectangular-accessory', revision: 1, label: 'Rectangular accessory interface', status: 'awaiting-fit-tests',
   engagementDirection: '+Z', supportedApertures: ['rounded-rectangle'],

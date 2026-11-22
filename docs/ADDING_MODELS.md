@@ -25,10 +25,9 @@ Keep the private source out of `src/` and `public/`. A reference-only model must
 not be labeled physically measured. Retain prior definition revisions.
 
 Reuse the collar strategy only where the contact geometry and mounting mechanics
-fit. Otherwise implement a separate mount strategy and compatibility rule; a
-matching aperture alone is insufficient. Never silently reuse a P96L collar for
-a physically different lamp. The synthetic rectangle test fixture exercises
-shape reuse without claiming a second real lamp is supported.
+fit. Otherwise implement a separate mount strategy and compatibility rule. The
+[Neewer TL21C prototype](TL21C_MEASUREMENTS.md) uses open-back side clips and shares
+the rounded-rectangle attachment generators with the P96L.
 
 ## Attachment
 

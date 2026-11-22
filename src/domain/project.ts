@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { attachments, historicalAttachments, historicalMounts, lamps, mounts, resolveDefinition } from '../catalog/registry.ts';
 import { decodeProject as decodeLegacy, encodeProject as encodeLegacy } from '../project.ts';
 import { defaultGrid, gridFields } from '../geometry/profile.ts';
-import type { Diagnostic, Field } from './definitions.ts';
+import type { Diagnostic, Field, LampDefinition } from './definitions.ts';
 
 export const engine = { generatorVersion: '0.3.0', kernel: 'manifold', kernelVersion: '3.5.5' } as const;
 const ref = z.strictObject({ id: z.string().min(1).max(100), revision: z.number().int().positive() });
@@ -18,16 +18,26 @@ export const designSchema = z.strictObject({
   export: z.strictObject({ format: z.enum(['stl', '3mf']), quality: z.literal('print'), orientation: z.enum(['front-down', 'assembly']) }),
 });
 export type Design = z.infer<typeof designSchema>;
-export function createDesign(format: Design['export']['format'] = '3mf'): Design {
-  return { format: 'lamp-attachment-project', schemaVersion: 1, units: 'mm', name: 'P96L honeycomb', engine: { ...engine },
-    lamp: { id: lamps[0].id, revision: lamps[0].revision },
-    mount: { id: mounts[0].id, revision: mounts[0].revision, parameters: { ...mounts[0].defaults } },
+export function defaultMountForLamp(lamp: LampDefinition): Design['mount'] {
+  const mount = mounts.find(entry => lamp.mounts.includes(entry.id));
+  return mount ? { id: mount.id, revision: mount.revision, parameters: { ...mount.defaults } } : null;
+}
+
+export function createDesign(format: Design['export']['format'] = '3mf', lamp = lamps[0]): Design {
+  const mount = defaultMountForLamp(lamp);
+  const name = lamp.id === lamps[0].id ? 'P96L honeycomb' : `${lamp.label} honeycomb`;
+  return { format: 'lamp-attachment-project', schemaVersion: 1, units: 'mm', name, engine: { ...engine },
+    lamp: { id: lamp.id, revision: lamp.revision },
+    mount,
     attachment: { id: attachments[0].id, revision: attachments[0].revision, parameters: { ...attachments[0].defaults } },
-    assembly: { mode: 'integrated', connection: null },
-    printProfile: { printer: 'bambu-lab', nozzleDiameterMm: 0.4, material: 'unspecified' }, export: { format, quality: 'print', orientation: 'front-down' } };
+    assembly: { mode: mount ? 'integrated' : 'standalone', connection: null },
+    printProfile: { printer: 'bambu-lab', nozzleDiameterMm: 0.4, material: 'unspecified' }, export: { format: mount ? format : 'stl', quality: 'print', orientation: 'front-down' } };
 }
 export const legacyAttachment = { id: 'honeycomb', revision: 1, label: 'Honeycomb · original grid', description: 'Original standalone grid geometry.', fields: gridFields.map(f => ({ ...f, unit: 'mm' as const })), defaults: defaultGrid, supportedApertures: ['rounded-rectangle' as const] };
 export function attachmentDefinition(project: Design) { return resolveDefinition([...attachments, ...historicalAttachments, legacyAttachment], project.attachment); }
+export function mountDefinition(mount: NonNullable<Design['mount']>) {
+  return resolveDefinition([...mounts, ...historicalMounts], mount);
+}
 function validateParameters(fields: readonly Field[], parameters: Record<string, number>) {
   const expected = new Set(fields.map(field => field.key));
   for (const key of Object.keys(parameters)) if (!expected.has(key)) throw new Error(`Unknown parameter ${key}.`);
@@ -54,7 +64,7 @@ export function validateDesign(input: unknown): Design {
   validateParameters(attachment.fields, project.attachment.parameters);
   if (!attachment.supportedApertures.includes('rounded-rectangle')) throw new Error('Attachment does not support this aperture.');
   if (project.mount) {
-    const mount = resolveDefinition([...mounts, ...historicalMounts], project.mount);
+    const mount = mountDefinition(project.mount);
     if (!lamp.mounts.includes(mount.id)) throw new Error('This mount is not compatible with the selected lamp.');
     validateParameters(mount.fields, project.mount.parameters);
   }
@@ -94,6 +104,10 @@ export function printDiagnostics(project: Design): Diagnostic[] {
       project.mount.parameters.retainingLipMm <= 1.5 + project.mount.parameters.fitClearancePerSideMm) {
     notes.push({ level: 'warning', code: 'corner-overlap', message: 'Hook reach does not overlap the modeled rear shoulder at this clearance. Increase hook reach or reduce fit clearance.' });
   }
+  if (project.assembly.mode !== 'standalone' && project.mount && mountDefinition(project.mount).strategy === 'wand-side-clips' &&
+      project.mount.parameters.retainingLipMm <= project.mount.parameters.fitClearancePerSideMm) {
+    notes.push({ level: 'warning', code: 'wand-hook-overlap', message: 'The clips do not reach behind the modeled shoulder at this clearance. Adjust hook reach and print a fit coupon.' });
+  }
   return notes;
 }
 // Original JSON encoding stays available for users who need the historical grid format.
@@ -101,13 +115,13 @@ export { encodeLegacy };
 
 function useCurrentDesign(project: Design): Design {
   const attachment = attachments.find(entry => entry.id === project.attachment.id)!;
-  const mount = mounts[0];
+  const mount = mounts.find(entry => entry.id === project.mount?.id);
   const olderAttachment = project.attachment.revision < attachment.revision;
-  const olderMount = project.mount !== null && project.mount.revision < mount.revision;
+  const olderMount = project.mount !== null && mount !== undefined && project.mount.revision < mount.revision;
   if (!olderAttachment && !olderMount) return project;
 
   const originalGrid = project.attachment.id === 'honeycomb' && project.attachment.revision === 1;
-  const next = createDesign('stl');
+  const next = createDesign('stl', resolveDefinition(lamps, project.lamp));
   next.name = project.name;
   next.lamp = project.lamp;
   next.printProfile = project.printProfile;
@@ -139,7 +153,7 @@ function useCurrentDesign(project: Design): Design {
   } else if (!originalGrid) {
     next.mount = null;
   }
-  if (project.mount && project.mount.revision >= 5) next.export.orientation = project.export.orientation;
+  if (project.mount && (!olderMount || project.mount.revision >= 5)) next.export.orientation = project.export.orientation;
   if (project.export.format === '3mf' && supportsMulticolor(next)) next.export.format = '3mf';
   return validateDesign(next);
 }

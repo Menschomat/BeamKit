@@ -8,14 +8,17 @@ export type LampReference = {
   aperture: Aperture;
   detail: {
     rearSeamFromBack: number;
+    crossSection?: readonly Point[];
+    apertureEdgeDepth?: number;
+    rearMarkers?: readonly (Aperture & { centerX: number; centerY: number })[];
     leftControlBay?: { insetMm: number; flatHalfSpanMm: number; outerHalfSpanMm: number };
     mountingSeat?: {
       centerX: number; faceY: number; openingCenterZ: number; openingRadiusMm: number;
       halfWidthMm: number; endHalfWidthMm: number; cornerRiseMm: number;
     };
     markers: readonly {
-      side: 'front-edge' | 'back-edge' | 'left-edge';
-      /** X on the long sides, Y on the left edge. */
+      side: 'front-edge' | 'back-edge' | 'left-edge' | 'right-edge';
+      /** X on the long sides, Y on the short sides. */
       centerAlongEdge: number;
       /** Distance from the nominal wall, positive toward the outside. */
       outwardOffset?: number;
@@ -26,6 +29,10 @@ export type LampReference = {
     }[];
   };
 };
+
+export function lampApertureZ(y: number, apertureHeight: number, edgeDepth: number) {
+  return -edgeDepth * (2 * y / apertureHeight) ** 2;
+}
 
 export function lampReferenceLines({ body, aperture, detail }: LampReference) {
   const outline = roundedOutline(body);
@@ -50,14 +57,19 @@ export function lampReferenceLines({ body, aperture, detail }: LampReference) {
     onPlane(housingOutline, 0),
     onPlane(housingOutline, -body.depth),
     onPlane(housingOutline, -body.depth + detail.rearSeamFromBack),
-    onPlane(roundedOutline(aperture), 0),
+    roundedOutline(aperture).map(([x, y]): Point3 => [x, y, lampApertureZ(y, aperture.height, detail.apertureEdgeDepth ?? 0)]),
     ...detail.markers.map(({ side, centerAlongEdge, centerZ, outwardOffset = 0, ...shape }): Point3[] => {
       const shortSidePlane = body.width / 2 + outwardOffset;
       const longSidePlane = (side === 'front-edge' ? -1 : 1) * (body.height / 2 + outwardOffset);
-      return roundedOutline(shape).map(([along, z]) => side === 'left-edge'
-        ? [-shortSidePlane, centerAlongEdge + along, centerZ + z]
-        : [centerAlongEdge + along, longSidePlane, centerZ + z]);
+      return roundedOutline(shape).map(([along, z]) => {
+        if (side === 'left-edge' || side === 'right-edge') {
+          return [(side === 'left-edge' ? -1 : 1) * shortSidePlane, centerAlongEdge + along, centerZ + z];
+        }
+        return [centerAlongEdge + along, longSidePlane, centerZ + z];
+      });
     }),
+    ...(detail.rearMarkers ?? []).map(({ centerX, centerY, ...shape }) => roundedOutline(shape)
+      .map(([x, y]): Point3 => [centerX + x, centerY + y, -body.depth - 0.03])),
   ];
   const segments: Point3[] = outline.filter((_, index) => index % 9 === 0)
     .flatMap(([x, y]): Point3[] => [[x, y, 0], [x, y, -body.depth]]);

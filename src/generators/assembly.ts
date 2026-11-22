@@ -1,6 +1,6 @@
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import { lamps, resolveDefinition } from '../catalog/registry.ts';
-import { printDiagnostics, validateDesign } from '../domain/project.ts';
+import { mountDefinition, printDiagnostics, validateDesign } from '../domain/project.ts';
 import type { Design } from '../domain/project.ts';
 import { gridMaterialLabel, materialRegions } from '../domain/materials.ts';
 import type { Bounds, Diagnostic, LampDefinition } from '../domain/definitions.ts';
@@ -13,10 +13,11 @@ import type { OverhangReport } from '../geometry/printability.ts';
 import { SolidScope, validateSolid } from '../geometry/solid.ts';
 import type { GridMesh } from '../geometry/protocol.ts';
 import { generateHoneycomb } from './honeycomb.ts';
+import { generateWandMount, wandAttachmentBaseZ } from './wand-mount.ts';
 
 export type PrintablePart = { name: string; mesh: GridMesh; bounds: Bounds; volumeMm3: number; transform: [number, number, number] };
 export type MaterialRegion = PrintablePart & { material: keyof typeof materialRegions };
-export type AssemblyResult = { parts: PrintablePart[]; regions?: MaterialRegion[]; diagnostics: Diagnostic[]; elapsedMs: number; projectRevision: number; provenance: Design['engine']; connection: null; printAnalysis?: OverhangReport };
+export type AssemblyResult = { parts: PrintablePart[]; regions?: MaterialRegion[]; diagnostics: Diagnostic[]; elapsedMs: number; projectRevision: number; lampId: string; provenance: Design['engine']; connection: null; printAnalysis?: OverhangReport };
 
 /** Join corresponding convex contours, including the horizontal sheet seat. */
 function loftOpening(kernel: ManifoldToplevel, rings: { outline: Point[]; z: number }[]) {
@@ -57,10 +58,11 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
       // Historical grids retain their original mesh exactly; validation is already performed by their generator.
       const frame = project.attachment.parameters.frame;
       return { parts: [{ name: `${prefix}-honeycomb`, mesh, bounds: { min: [-lamp.aperture.width / 2 - frame, -lamp.aperture.height / 2 - frame, 0], max: [lamp.aperture.width / 2 + frame, lamp.aperture.height / 2 + frame, project.attachment.parameters.depth] }, volumeMm3: meshVolume(mesh), transform: [0, 0, 0] }],
-        diagnostics: printDiagnostics(project), elapsedMs: performance.now() - start, projectRevision, provenance: project.engine, connection: null };
+        diagnostics: printDiagnostics(project), elapsedMs: performance.now() - start, projectRevision, lampId: lamp.id, provenance: project.engine, connection: null };
     }
     const p = project.attachment.parameters;
-    const dfam = (project.mount?.revision ?? 0) >= 2;
+    const wandMount = project.mount && mountDefinition(project.mount).strategy === 'wand-side-clips';
+    const dfam = wandMount || (project.mount?.revision ?? 0) >= 2;
     const inset = p.inset ?? 0;
     const aperture = { width: lamp.aperture.width - inset * 2, height: lamp.aperture.height - inset * 2, radius: Math.max(0.5, lamp.aperture.radius - inset) };
     let attachment: Manifold;
@@ -114,7 +116,14 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
       }
     }
     let solid = attachment;
-    if (project.mount && project.assembly.mode !== 'standalone') {
+    let attachmentBaseZ = 0;
+    if (project.mount && wandMount && project.assembly.mode !== 'standalone') {
+      const fitTest = project.assembly.mode === 'fit-test';
+      const frame = isGridPattern(pattern) ? p.frame : p.wall;
+      const cradle = generateWandMount(kernel, scope, lamp, aperture, frame, project.mount.parameters, fitTest);
+      attachmentBaseZ = wandAttachmentBaseZ;
+      solid = fitTest ? cradle : own(cradle.add(own(attachment.translate([0, 0, attachmentBaseZ]))));
+    } else if (project.mount && project.assembly.mode !== 'standalone') {
       const m = project.mount.parameters;
       const fit = m.fitClearancePerSideMm, thickness = m.supportThicknessMm;
       const cavity = { width: lamp.body.width + 2 * fit, height: lamp.body.height + 2 * fit, radius: lamp.body.radius + fit };
@@ -234,7 +243,8 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
         collar = own(collar.add(own(hollow.translate([0, 0, seatTop]))));
       }
       for (const keepout of lamp.keepouts) collar = own(collar.subtract(box({ min: [keepout.bounds.min[0], keepout.bounds.min[1], project.mount.revision >= 3 ? Math.min(keepout.bounds.min[2], -m.engagementMm - 1) : keepout.bounds.min[2]], max: keepout.bounds.max })));
-      const raisedAttachment = own(attachment.translate([0, 0, m.diffuserClearanceMm + thickness - 0.4]));
+      attachmentBaseZ = m.diffuserClearanceMm + thickness - 0.4;
+      const raisedAttachment = own(attachment.translate([0, 0, attachmentBaseZ]));
       solid = project.assembly.mode === 'fit-test' ? collar : own(collar.add(raisedAttachment));
       const plateSeat = lamp.mountingFacts?.plateSeat;
       if (plateSeat && m.plateClearanceWidthMm > 0) {
@@ -261,6 +271,8 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
           solid = own(solid.subtract(cutter));
         }
       }
+    }
+    if (project.assembly.mode !== 'standalone') {
       for (const keepout of lamp.keepouts) {
         const overlap = own(solid.intersect(box(keepout.bounds)));
         if (overlap.volume() > 1e-5) throw new Error(`Geometry blocks ${keepout.id}. Increase front clearance or use a compatible configuration.`);
@@ -273,13 +285,11 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     if (dfam && isGridPattern(pattern) && printAnalysis.steepOverhangAreaMm2 > 0.00001) throw new Error('This configuration exceeds the 45-degree front-down print limit. Adjust the frame, depth or fit settings.');
     let regions: MaterialRegion[] | undefined;
     if (project.export.format === '3mf' && project.mount) {
-      const { diffuserClearanceMm, supportThicknessMm } = project.mount.parameters;
-      const baseZ = diffuserClearanceMm + supportThicknessMm - 0.4;
       const volumeAtOffset = (offset: number) => extrude(section({
         width: aperture.width + 2 * offset,
         height: aperture.height + 2 * offset,
         radius: aperture.radius + offset,
-      }), p.depth + 0.1, baseZ);
+      }), p.depth + 0.1, attachmentBaseZ);
       // A 0.4 mm rim joins the grid walls. The next 0.8 mm is the liner.
       // Cutting the same finished solid keeps the regions in contact without overlapping.
       const gridBoundary = volumeAtOffset(0.4);
@@ -297,8 +307,8 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     }
     const diagnostics = printDiagnostics(project);
     if (printAnalysis.steepOverhangAreaMm2 > 0.00001) diagnostics.push({ level: 'warning', code: 'overhangs', message: 'This revision has downward-facing ledges. Inspect bridging and supports in your slicer; support-free printing is not verified.' });
-    const name = project.assembly.mode === 'fit-test' ? `${prefix}-collar-fit-test` : `${prefix}-${project.attachment.id}`;
-    return { parts: [{ name, ...checked, transform: [0, 0, 0] }], regions, diagnostics, elapsedMs: performance.now() - start, projectRevision, provenance: project.engine, connection: null, printAnalysis };
+    const name = project.assembly.mode === 'fit-test' ? `${prefix}-${wandMount ? 'clip' : 'collar'}-fit-test` : `${prefix}-${project.attachment.id}`;
+    return { parts: [{ name, ...checked, transform: [0, 0, 0] }], regions, diagnostics, elapsedMs: performance.now() - start, projectRevision, lampId: lamp.id, provenance: project.engine, connection: null, printAnalysis };
   } finally { scope.dispose(); }
 }
 function meshVolume(mesh: GridMesh) {

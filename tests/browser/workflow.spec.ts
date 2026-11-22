@@ -1,5 +1,38 @@
 import { test, expect } from '@playwright/test';
 
+test('Neewer selection changes the preview, persists, and exports model-specific files', async ({ page }) => {
+  const project = page.getByRole('button', { name: 'Project', exact: true });
+  const lamp = page.getByLabel('Lamp', { exact: true });
+  const export3mf = page.getByRole('button', { name: 'Export 3MF' });
+  await page.goto('/');
+  await expect(export3mf).toBeEnabled();
+  await project.click();
+  await lamp.selectOption('neewer.tl21c');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Neewer TL21C' })).toBeVisible();
+  await expect(page.locator('.dimensions')).toHaveText('221.2 × 46.3 × 52.0 mm');
+  await expect(page.locator('.viewport canvas')).toBeVisible();
+  const gridDownload = page.waitForEvent('download');
+  await export3mf.click();
+  expect((await gridDownload).suggestedFilename()).toBe('tl21c-honeycomb-multicolor.3mf');
+  await page.getByRole('button', { name: 'Print', exact: true }).click();
+  await page.getByLabel('Output', { exact: true }).selectOption('fit-test');
+  const exportStl = page.getByRole('button', { name: 'Export STL' });
+  await expect(exportStl).toBeEnabled();
+  const couponDownload = page.waitForEvent('download');
+  await exportStl.click();
+  expect((await couponDownload).suggestedFilename()).toBe('tl21c-clip-fit-test.stl');
+  await expect(page.getByRole('status')).toContainText('Saved locally');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Neewer TL21C' })).toBeVisible();
+  await expect(exportStl).toBeEnabled();
+  await project.click();
+  await lamp.selectOption('smallrig.p96l');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'SmallRig P96L' })).toBeVisible();
+  await expect(exportStl).toBeEnabled();
+});
+
 test('the preview switches between the lit assembly and print pose', async ({ page }) => {
   await page.goto('/');
   const export3mf = page.getByRole('button', { name: 'Export 3MF', exact: true });
