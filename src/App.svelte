@@ -20,6 +20,20 @@
   import type { createViewport } from './viewport.ts';
   import type { ViewOptions } from './viewport.ts';
 
+  type ThemePreference = 'system' | 'light' | 'dark';
+  const themeKey = 'beamkit-theme';
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+  function loadTheme(): ThemePreference {
+    try {
+      const value = localStorage.getItem(themeKey);
+      if (value === 'light' || value === 'dark') return value;
+    } catch { /* Storage may be unavailable in this browser. */ }
+    return 'system';
+  }
+  let themePreference = $state<ThemePreference>(loadTheme());
+  let systemDark = $state(systemTheme.matches);
+  const theme = $derived(themePreference === 'system' ? (systemDark ? 'dark' : 'light') : themePreference);
+
   let project = $state<Design>(createDesign());
   let result = $state.raw<AssemblyResult | null>(null);
   let current = $state(false), booting = $state(true), saving = $state(false), saved = $state(false);
@@ -106,6 +120,11 @@
     project.export.format = enabled && supportsMulticolor(project) ? '3mf' : 'stl';
     rebuild();
   }
+  function changeTheme(preference: ThemePreference) {
+    themePreference = preference;
+    try { localStorage.setItem(themeKey, preference); }
+    catch { /* Apply the choice for this session when storage is unavailable. */ }
+  }
   function history(direction: 'undo' | 'redo') {
     const stack = direction === 'undo' ? undoStack : redoStack, snapshot = stack.at(-1); if (!snapshot) return;
     if (direction === 'undo') { redoStack = [...redoStack, JSON.stringify(project)]; undoStack = stack.slice(0, -1); }
@@ -182,13 +201,15 @@
   }
   onMount(() => {
     disposed = false;
+    const updateSystemTheme = (event: MediaQueryListEvent) => { systemDark = event.matches; };
+    systemTheme.addEventListener('change', updateSystemTheme);
     const refreshReadiness = () => { void isOfflineReady(new URL(workerUrl, document.baseURI).href).then(ready => { if (!disposed) offlineReady = ready; }); };
     navigator.serviceWorker?.addEventListener('controllerchange', refreshReadiness);
     if ('serviceWorker' in navigator) void navigator.serviceWorker.ready.then(refreshReadiness);
     applyUpdate = registerSW({ onOfflineReady() { refreshReadiness(); }, onNeedRefresh() { updateReady = true; }, onRegisterError() { storageError = 'Offline preparation failed. JSON backup and online editing remain available.'; } });
     void import('./viewport.ts').then(({ createViewport }) => {
       if (disposed) return;
-      try { viewport = createViewport(host); viewport.update(result, { ...view }); }
+      try { viewport = createViewport(host); viewport.update(result, { ...view }, theme); }
       catch { previewError = 'WebGL preview is unavailable. Geometry and STL export still work.'; }
     }).catch(() => { previewError = 'The preview could not load. Geometry and STL export still work.'; });
     controller = new GeometryController(() => new Worker(workerUrl, { type: 'module' }), generated => {
@@ -198,9 +219,25 @@
     void loadProject('_autosave').then(next => { if (next && !disposed) { project = next; localName = next.name; } return projectNames(); })
       .then(list => { if (!disposed) names = list; }).catch(() => { storageError = 'Local storage is unavailable. Use JSON files to keep your work.'; })
       .finally(() => { if (!disposed) { booting = false; rebuild(); } });
-    return () => { disposed = true; navigator.serviceWorker?.removeEventListener('controllerchange', refreshReadiness); clearTimeout(saveTimer); controller?.dispose(); viewport?.dispose(); };
+    return () => {
+      disposed = true;
+      systemTheme.removeEventListener('change', updateSystemTheme);
+      navigator.serviceWorker?.removeEventListener('controllerchange', refreshReadiness);
+      clearTimeout(saveTimer); controller?.dispose(); viewport?.dispose();
+    };
   });
-  $effect(() => { const activeResult = result; const options = { ...view }; viewport?.update(activeResult, options); });
+  $effect.pre(() => {
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    const surface = getComputedStyle(root).getPropertyValue('--color-surface').trim();
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', surface);
+  });
+  $effect(() => {
+    const activeResult = result;
+    const options = { ...view };
+    const activeTheme = theme;
+    viewport?.update(activeResult, options, activeTheme);
+  });
   $effect(() => { if (importCandidate && importDialog && !importDialog.open) importDialog.showModal(); });
 </script>
 
@@ -362,6 +399,14 @@
     <button disabled={!current} onclick={saveBundle}>Save bundle</button>
     <button disabled={booting || !undoStack.length} onclick={() => { history('undo'); projectDialog?.close(); }}>Undo</button>
     <button disabled={booting || !redoStack.length} onclick={() => { history('redo'); projectDialog?.close(); }}>Redo</button>
+  </div>
+  <div class="parameter">
+    <label class="section-heading" for="theme">Theme</label>
+    <select id="theme" value={themePreference} onchange={event => changeTheme(event.currentTarget.value as ThemePreference)}>
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
   </div>
   <details ontoggle={event => { if (event.currentTarget.open) void showHistory(); }}>
     <summary>Autosave history</summary>

@@ -1,5 +1,37 @@
 import { test, expect } from '@playwright/test';
 
+test('theme follows the system until overridden and remembers the choice', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/');
+  const root = page.locator('html');
+  const project = page.getByRole('button', { name: 'Project', exact: true });
+  const theme = page.getByLabel('Theme', { exact: true });
+  await expect(root).toHaveCSS('color-scheme', 'dark');
+  await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+  await project.click();
+  await expect(theme).toHaveValue('system');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(root).toHaveCSS('color-scheme', 'light');
+
+  await theme.selectOption('dark');
+  await expect(root).toHaveCSS('color-scheme', 'dark');
+  await page.reload();
+  await expect(root).toHaveCSS('color-scheme', 'dark');
+  await project.click();
+  await expect(theme).toHaveValue('dark');
+
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await theme.selectOption('light');
+  await expect(root).toHaveCSS('color-scheme', 'light');
+  await theme.selectOption('system');
+  await expect(root).toHaveCSS('color-scheme', 'dark');
+  await page.reload();
+  await project.click();
+  await expect(theme).toHaveValue('system');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(root).toHaveCSS('color-scheme', 'light');
+});
+
 test('integrated design, JSON confirmation, history, fit test, holder, and offline restore', async ({ page, context }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');

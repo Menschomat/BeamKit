@@ -14,7 +14,9 @@ export function createViewport(host: HTMLElement) {
   const renderer = new WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.localClippingEnabled = true;
   host.append(renderer.domElement);
-  const scene = new Scene(); scene.background = new Color('#ececef');
+  const scene = new Scene();
+  const background = new Color(getComputedStyle(host).getPropertyValue('--color-canvas').trim());
+  scene.background = background;
   const camera = new PerspectiveCamera(34, 1, 0.1, 2000); camera.up.set(0, 0, 1);
   const controls = new OrbitControls(camera, renderer.domElement); controls.maxDistance = 600; controls.minDistance = 35;
   const floor = new GridHelper(350, 35, '#c9c9cd', '#dfdfe3'); floor.rotation.x = Math.PI / 2; floor.position.z = -16;
@@ -105,6 +107,7 @@ export function createViewport(host: HTMLElement) {
   const printMaterials = [material, ...Object.values(regionMaterials)];
   const cutPlane = new Plane(new Vector3(0, -1, 0), 0);
   let displayed: AssemblyResult | null = null;
+  let displayedTheme: 'light' | 'dark' | undefined;
   const render = () => renderer.render(scene, camera);
   controls.addEventListener('change', render);
   const resize = new ResizeObserver(() => {
@@ -136,7 +139,17 @@ export function createViewport(host: HTMLElement) {
   fit();
   return {
     fit,
-    update(result: AssemblyResult | null, options: ViewOptions) {
+    update(result: AssemblyResult | null, options: ViewOptions, theme: 'light' | 'dark') {
+      if (theme !== displayedTheme) {
+        const dark = theme === 'dark';
+        displayedTheme = theme;
+        background.set(getComputedStyle(host).getPropertyValue('--color-canvas').trim());
+        floor.material.color.set(dark ? '#454750' : '#ffffff');
+        lines.color.set(dark ? '#c4c7d0' : '#535660');
+        apertureLine.color.set(dark ? '#ff8e79' : '#a94635');
+        housingTint.color.set(dark ? '#a1a4ad' : '#858791');
+        keepoutMaterial.color.set(dark ? '#ff8e79' : '#c04c39');
+      }
       lamp.visible = options.lampVisible && options.mode === 'assembly';
       lines.opacity = options.lampOpacity;
       apertureLine.opacity = options.lampOpacity * 0.85;
