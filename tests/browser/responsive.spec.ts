@@ -45,6 +45,20 @@ for (const width of [320, 390, 640, 768, 900, 1024, 1440]) {
   });
 }
 
+test('the header fits at 320px with wider font metrics', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.goto('/');
+  await page.addStyleTag({ content: 'html { font-family: monospace; letter-spacing: 0.045em; }' });
+  const header = page.getByRole('banner');
+  const exportStl = header.getByRole('button', { name: 'Export STL', exact: true });
+  await expect(exportStl).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  for (const button of [header.getByRole('button', { name: 'Project', exact: true }), exportStl]) {
+    await expect(button).toBeInViewport({ ratio: 1 });
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+});
+
 for (const width of [390, 1024]) {
   test(`parameter tabs and attachment selector stay fixed at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 650 });
