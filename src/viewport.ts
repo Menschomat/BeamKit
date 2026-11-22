@@ -1,7 +1,7 @@
 import {
   AmbientLight, Box3, BoxGeometry, BufferAttribute, BufferGeometry, Color, DirectionalLight,
   EdgesGeometry, ExtrudeGeometry, GridHelper, Group, LineBasicMaterial, LineLoop, LineSegments, Mesh,
-  MeshBasicMaterial, MeshStandardMaterial, Path, PerspectiveCamera, Plane, PointLight, Scene, Shape, ShapeGeometry,
+  MeshBasicMaterial, MeshStandardMaterial, Path, PerspectiveCamera, Plane, Scene, Shape, ShapeGeometry,
   Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -9,6 +9,7 @@ import { lamps } from './catalog/registry.ts';
 import { lampReferenceLines } from './geometry/lamp-reference.ts';
 import { materialRegions } from './domain/materials.ts';
 import type { AssemblyResult } from './generators/assembly.ts';
+import type { createPanelLighting } from './viewport-lighting.ts';
 export type ViewOptions = {
   mode: 'assembly' | 'part' | 'section' | 'print';
   lampVisible: boolean;
@@ -36,7 +37,7 @@ export function createViewport(host: HTMLElement) {
   const apertureLine = new LineBasicMaterial({ color: '#a94635', transparent: true, depthWrite: false });
   const housingTint = new MeshBasicMaterial({ color: '#858791', transparent: true, depthWrite: false });
   const apertureTint = new MeshBasicMaterial({ color: '#ff634a', transparent: true, depthWrite: false });
-  const litAperture = new MeshBasicMaterial({ color: '#fff5db', toneMapped: false });
+  const litAperture = new MeshBasicMaterial({ color: new Color('#fff2db').multiplyScalar(2.6), toneMapped: false });
   const housingDepth = new MeshBasicMaterial({
     transparent: true, colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
   });
@@ -58,15 +59,6 @@ export function createViewport(host: HTMLElement) {
   apertureMesh.position.z = 0.01;
   apertureMesh.renderOrder = 1;
   lamp.add(apertureMesh);
-  // Spread soft preview lighting across the diffuser to pick out the inner grid walls.
-  const diffuserLights = new Group();
-  for (const x of [-0.27, 0.27]) for (const y of [-0.24, 0.24]) {
-    const glow = new PointLight('#fff1d2', 260, 45);
-    glow.position.set(x * profile.aperture.width, y * profile.aperture.height, -profile.body.depth * 0.7);
-    diffuserLights.add(glow);
-  }
-  diffuserLights.visible = false;
-  scene.add(diffuserLights);
   const bay = profile.detail.leftControlBay;
   const bayPlane = bay ? -profile.body.width / 2 + bay.insetMm : undefined;
   const seamSegments = rearSeam.flatMap((point, i) => {
@@ -125,11 +117,19 @@ export function createViewport(host: HTMLElement) {
   const cutPlane = new Plane(new Vector3(0, -1, 0), 0);
   let displayed: AssemblyResult | null = null;
   let displayedTheme: 'light' | 'dark' | undefined;
-  const render = () => renderer.render(scene, camera);
+  let lampOn = false;
+  let disposed = false;
+  let lightingRequested = false;
+  let lighting: ReturnType<typeof createPanelLighting> | undefined;
+  const render = () => {
+    if (lampOn && lighting) lighting.render();
+    else renderer.render(scene, camera);
+  };
   controls.addEventListener('change', render);
   const resize = new ResizeObserver(() => {
     const width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight);
-    renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix(); fit();
+    renderer.setSize(width, height); lighting?.resize(width, height);
+    camera.aspect = width / height; camera.updateProjectionMatrix(); fit();
   }); resize.observe(host);
   function fit(front = false) {
     const bounds = new Box3(); if (lamp.visible) bounds.expandByObject(lamp);
@@ -168,8 +168,16 @@ export function createViewport(host: HTMLElement) {
         keepoutMaterial.color.set(dark ? '#ff8e79' : '#c04c39');
       }
       lamp.visible = options.lampVisible && options.mode === 'assembly';
-      diffuserLights.visible = lamp.visible && options.lampOn;
-      apertureMesh.material = diffuserLights.visible ? litAperture : apertureTint;
+      lampOn = lamp.visible && options.lampOn;
+      apertureMesh.material = lampOn ? litAperture : apertureTint;
+      if (lampOn && !lightingRequested) {
+        lightingRequested = true;
+        void import('./viewport-lighting.ts').then(({ createPanelLighting }) => {
+          if (disposed) return;
+          lighting = createPanelLighting(renderer, scene, camera, profile.aperture);
+          render();
+        }).catch(() => { /* The bright diffuser still renders if the lighting module is unavailable. */ });
+      }
       lines.opacity = options.lampOpacity;
       apertureLine.opacity = options.lampOpacity * 0.85;
       housingTint.opacity = options.lampOpacity * 0.32;
@@ -201,6 +209,8 @@ export function createViewport(host: HTMLElement) {
       render();
     },
     dispose() {
+      disposed = true;
+      lighting?.dispose();
       resize.disconnect(); controls.dispose(); clearParts(); printMaterials.forEach(printMaterial => printMaterial.dispose());
       const referenceGeometries = new Set(lamp.children.map(object => (object as Mesh | LineLoop | LineSegments).geometry));
       referenceGeometries.forEach(geometry => geometry.dispose());
