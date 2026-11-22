@@ -4,6 +4,7 @@
   import { isOfflineReady } from './pwa/readiness.ts';
   import { registerSW } from 'virtual:pwa-register';
   import ParameterField from './app/ParameterField.svelte';
+  import LampPicker from './app/LampPicker.svelte';
   import { isGridPattern } from './catalog/grid-patterns.ts';
   import { attachments, lamps, resolveDefinition } from './catalog/registry.ts';
   import { attachmentDefinition, createDesign, decodeDesign, defaultMountForLamp, encodeDesign, mountDefinition, printDiagnostics, supportsMulticolor, validateDesign } from './domain/project.ts';
@@ -260,15 +261,14 @@
   <main id="workspace" class="workspace">
     <section class="stage" aria-label="Accessory preview">
       <div class="stage-header">
-        <div class="stage-title" class:lamp-picker={lamps.length > 1}>
-          <h1>{selectedLamp.label}</h1>
+        <div class="stage-title">
+          {#if lamps.length > 1}
+            <LampPicker {lamps} selected={selectedLamp} disabled={booting} onchange={changeLamp} />
+          {:else}
+            <h1>{selectedLamp.label}</h1>
+          {/if}
           {#if dimensions}
             <p class="dimensions" aria-label="Model dimensions">{dimensions.map(value => value.toFixed(1)).join(' × ')} mm</p>
-          {/if}
-          {#if lamps.length > 1}
-            <select aria-label="Lamp" disabled={booting} value={project.lamp.id} onchange={event => changeLamp(event.currentTarget.value)}>
-              {#each lamps as lamp}<option value={lamp.id}>{lamp.label}</option>{/each}
-            </select>
           {/if}
         </div>
         <div class="pose-toggle" role="group" aria-label="Preview pose">

@@ -163,25 +163,55 @@ details[open] > summary::after { content: '−' / ''; }
 }
 .stage-title { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 16px; min-width: 0; }
 h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; letter-spacing: -.035em; }
-.lamp-picker { position: relative; min-height: var(--control-height); align-content: center; }
-.lamp-picker h1::after {
-  content: '';
-  display: inline-block;
+.lamp-picker { position: relative; width: fit-content; }
+.lamp-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+.lamp-trigger, .lamp-trigger:hover:not(:disabled) { background: transparent; }
+.lamp-chevron, .lamp-check {
+  display: block;
+  flex: none;
   width: 7px;
   height: 7px;
-  margin-inline-start: 8px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  vertical-align: .2em;
-  transform: rotate(45deg);
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
 }
-.lamp-picker select { position: absolute; inset: 0; height: 100%; opacity: 0; }
-.lamp-picker:hover h1 { color: var(--accent-ink); }
-.lamp-picker:has(select:focus-visible) {
-  border-radius: var(--control-radius);
-  outline: 2px solid var(--focus-color);
-  outline-offset: 2px;
+.lamp-chevron { color: var(--color-muted); }
+.lamp-trigger[aria-expanded=true] .lamp-chevron { transform: translateY(2px) rotate(225deg); }
+.lamp-menu {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 4px);
+  inset-inline-start: 0;
+  width: 208px;
+  padding: 4px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: 0 6px 18px #13263133;
 }
+.lamp-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-inline: 10px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.lamp-menu button[aria-checked=true] { background: var(--field-surface); }
+.lamp-menu button:focus-visible { outline-offset: -2px; }
+.lamp-check { width: 6px; height: 10px; color: var(--accent-ink); }
 .dimensions { color: var(--color-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .preview-area { position: relative; display: flex; flex: 1; min-height: 0; }
 .viewport { flex: 1; min-width: 0; min-height: 0; width: 100%; overflow: hidden; }

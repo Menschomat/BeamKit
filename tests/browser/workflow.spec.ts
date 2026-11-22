@@ -1,12 +1,19 @@
 import { test, expect } from '@playwright/test';
 
 test('Neewer selection changes the preview, persists, and exports model-specific files', async ({ page }) => {
-  const lamp = page.getByRole('region', { name: 'Accessory preview' }).getByRole('combobox', { name: 'Lamp', exact: true });
+  const lamp = page.getByRole('button', { name: /^Lamp: / });
+  const models = page.getByRole('menu', { name: 'Lamp models' });
+  const neewer = models.getByRole('menuitemradio', { name: 'Neewer TL21C' });
+  const smallrig = models.getByRole('menuitemradio', { name: 'SmallRig P96L' });
   const export3mf = page.getByRole('button', { name: 'Export 3MF' });
   await page.goto('/');
   await expect(export3mf).toBeEnabled();
-  await expect(lamp).toHaveValue('smallrig.p96l');
-  await lamp.selectOption('neewer.tl21c');
+  await lamp.click();
+  await expect(smallrig).toHaveAttribute('aria-checked', 'true');
+  await neewer.click();
+  await expect(lamp).toHaveAttribute('aria-expanded', 'false');
+  await expect(lamp).toHaveCSS('outline-style', 'none');
+  await expect(models).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Neewer TL21C' })).toBeVisible();
   await expect(page.locator('.dimensions')).toHaveText('221.2 × 46.3 × 50.8 mm');
   await expect(page.locator('.viewport canvas')).toBeVisible();
@@ -28,9 +35,22 @@ test('Neewer selection changes the preview, persists, and exports model-specific
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Neewer TL21C' })).toBeVisible();
   await expect(exportStl).toBeEnabled();
-  await lamp.selectOption('smallrig.p96l');
+  await lamp.press('ArrowDown');
+  await expect(neewer).toBeFocused();
+  await neewer.press('Escape');
+  await expect(lamp).toBeFocused();
+  await expect(models).toHaveCount(0);
+  await lamp.press('ArrowDown');
+  await neewer.press('ArrowUp');
+  await expect(smallrig).toBeFocused();
+  await smallrig.press('Enter');
+  await expect(lamp).toBeFocused();
   await expect(page.getByRole('heading', { name: 'SmallRig P96L' })).toBeVisible();
   await expect(exportStl).toBeEnabled();
+  await lamp.click();
+  await expect(models).toBeVisible();
+  await page.locator('.viewport canvas').click();
+  await expect(models).toHaveCount(0);
 });
 
 test('the preview switches between the lit assembly and print pose', async ({ page }) => {
