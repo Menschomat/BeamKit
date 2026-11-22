@@ -1,7 +1,7 @@
 import {
   AmbientLight, Box3, BoxGeometry, BufferAttribute, BufferGeometry, Color, DirectionalLight,
   EdgesGeometry, ExtrudeGeometry, GridHelper, Group, LineBasicMaterial, LineLoop, LineSegments, Mesh,
-  MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, Plane, Scene, Shape, ShapeGeometry,
+  MeshBasicMaterial, MeshStandardMaterial, Path, PerspectiveCamera, Plane, Scene, Shape, ShapeGeometry,
   Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -57,16 +57,31 @@ export function createViewport(host: HTMLElement) {
   const seam = new LineSegments(new BufferGeometry().setFromPoints(seamSegments.map(p => new Vector3(...p))), lines);
   seam.renderOrder = 2;
   lamp.add(seam);
+  function addOutline(points: Vector3[], material: LineBasicMaterial) {
+    const outline = new LineLoop(new BufferGeometry().setFromPoints(points), material);
+    outline.renderOrder = 2;
+    lamp.add(outline);
+  }
   for (const [i, loop] of [front, reference.loops[1], aperture, ...markers].entries()) {
     // Project the measured opening outlines onto the visible bay wall instead of drawing
     // them behind the simplified housing surface.
     const markerPlane = bayPlane !== undefined && i >= 3 && profile.detail.markers[i - 3].side === 'left-edge'
       ? bayPlane - 0.01 : undefined;
-    const points = loop.map(([x, y, z]) => new Vector3(markerPlane ?? x, y, z));
-    const outline = new LineLoop(new BufferGeometry().setFromPoints(points),
+    addOutline(loop.map(([x, y, z]) => new Vector3(markerPlane ?? x, y, z)),
       loop === aperture ? apertureLine : lines);
-    outline.renderOrder = 2;
-    lamp.add(outline);
+  }
+  if (reference.mountingSeat) {
+    const { outline, opening } = reference.mountingSeat;
+    const toFace = ([x, , z]: [number, number, number]) => new Vector2(x, z);
+    const shape = new Shape(outline.map(toFace));
+    shape.holes.push(new Path(opening.map(toFace)));
+    const seat = new Mesh(new ShapeGeometry(shape), housingTint);
+    seat.rotation.x = Math.PI / 2;
+    seat.position.y = outline[0][1];
+    seat.renderOrder = 1;
+    lamp.add(seat);
+    addOutline(outline.map(point => new Vector3(...point)), lines);
+    addOutline(opening.map(point => new Vector3(...point)), apertureLine);
   }
   const uprights = new LineSegments(new BufferGeometry().setFromPoints(reference.segments.map(p => new Vector3(...p))), lines);
   uprights.renderOrder = 2;

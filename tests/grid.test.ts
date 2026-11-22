@@ -71,6 +71,16 @@ test('procedural reference includes the inset, rear seam, and schematic side mar
   assert.equal(segments.length, 8);
 });
 
+test('the procedural wireframe shows the mounting face and centered screw opening', () => {
+  const { mountingSeat } = lampReferenceLines(p96l);
+  assert.ok(mountingSeat);
+  const { outline, opening } = mountingSeat;
+  assert.ok([...outline, ...opening].every(([, y]) => y === -30.5));
+  assert.deepEqual(outline[0], [-6.84, -30.5, 0]);
+  assert.ok(outline.some(([x, , z]) => x === 8.68 && z === -0.75));
+  assert.ok(outline.some(([x, , z]) => x === 6.84 && z === -11.5));
+  assert.ok(opening.every(([x, , z]) => Math.abs(Math.hypot(x, z + 5.75) - 3.175) < 1e-9));
+});
 
 test('project imports reject unknown fields, revisions, and oversized files', () => {
   const project = JSON.parse(encodeProject(defaultGrid));

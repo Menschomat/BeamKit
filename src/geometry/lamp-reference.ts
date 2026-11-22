@@ -9,6 +9,10 @@ export type LampReference = {
   detail: {
     rearSeamFromBack: number;
     leftControlBay?: { insetMm: number; flatHalfSpanMm: number; outerHalfSpanMm: number };
+    mountingSeat?: {
+      centerX: number; faceY: number; openingCenterZ: number; openingRadiusMm: number;
+      halfWidthMm: number; endHalfWidthMm: number; cornerRiseMm: number;
+    };
     markers: readonly {
       side: 'front-edge' | 'back-edge' | 'left-edge';
       /** X on the long sides, Y on the left edge. */
@@ -57,5 +61,21 @@ export function lampReferenceLines({ body, aperture, detail }: LampReference) {
   ];
   const segments: Point3[] = outline.filter((_, index) => index % 9 === 0)
     .flatMap(([x, y]): Point3[] => [[x, y, 0], [x, y, -body.depth]]);
-  return { loops, segments };
+  const seat = detail.mountingSeat;
+  if (!seat) return { loops, segments };
+  const { centerX, faceY, halfWidthMm, endHalfWidthMm, cornerRiseMm, openingCenterZ, openingRadiusMm } = seat;
+  const rear = -body.depth;
+  const seatOutline: Point[] = [
+    [-endHalfWidthMm, 0], [endHalfWidthMm, 0], [halfWidthMm, -cornerRiseMm],
+    [halfWidthMm, rear + cornerRiseMm], [endHalfWidthMm, rear], [-endHalfWidthMm, rear],
+    [-halfWidthMm, rear + cornerRiseMm], [-halfWidthMm, -cornerRiseMm],
+  ];
+  const mountingSeat = {
+    outline: seatOutline.map(([x, z]): Point3 => [centerX + x, faceY, z]),
+    opening: Array.from({ length: 48 }, (_, i): Point3 => {
+      const angle = i / 48 * Math.PI * 2;
+      return [centerX + openingRadiusMm * Math.cos(angle), faceY, openingCenterZ + openingRadiusMm * Math.sin(angle)];
+    }),
+  };
+  return { loops, segments, mountingSeat };
 }

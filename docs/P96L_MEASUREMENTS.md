@@ -67,3 +67,10 @@ that plane across a default 72 mm span. The Fit panel adjusts the span from 40
 to 88 mm along the lamp edge. The recess extends through the full printed
 depth, and the fit coupon includes it. Check that the intended plate seats
 flush and that its screw engages on the physical lamp.
+
+The assembly wireframe shows the threaded seating face and its screw opening.
+The face is 17.36 mm wide across the straight sides and 13.68 mm wide at
+the front and rear edges, with the corners changing width over 0.75 mm. The
+opening is shown at X = 0, Z = −5.75 mm with the reference outer thread
+radius of 3.175 mm. The preview uses a circular opening and simplified
+corners from the STEP measurements.

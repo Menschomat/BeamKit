@@ -49,7 +49,7 @@ export const lamps: readonly LampDefinition[] = [{ ...p96l,
   provenance: { source: 'Reference-model dimensions recorded in PROJECT_PLAN.md', confidence: 'reference-only',
     note: 'Housing and aperture dimensions have not been checked against a physical lamp. Preview is independently procedural.' },
   mounts: ['smallrig.p96l.collar'],
-  mountingFacts: { rightSideInsetMm: 0.8, rearFaceInsetMm: 1.5, plateSeat: { centerX: 0, faceY: -30.5 } },
+  mountingFacts: { rightSideInsetMm: 0.8, rearFaceInsetMm: 1.5, plateSeat: p96l.detail.mountingSeat },
   keepouts: [
     // Conservative access volumes from private reference measurements, expanded for use.
     { id: 'usb-cable-access', bounds: { min: [-49, -50, -13.5], max: [-29, -26, 0.4] }, confidence: 'provisional' },
