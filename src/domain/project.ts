@@ -139,7 +139,7 @@ function useCurrentDesign(project: Design): Design {
   } else if (!originalGrid) {
     next.mount = null;
   }
-  if (project.mount?.revision === 5) next.export.orientation = project.export.orientation;
+  if (project.mount && project.mount.revision >= 5) next.export.orientation = project.export.orientation;
   if (project.export.format === '3mf' && supportsMulticolor(next)) next.export.format = '3mf';
   return validateDesign(next);
 }

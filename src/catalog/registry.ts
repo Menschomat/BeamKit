@@ -20,12 +20,13 @@ const cornerMount: MountDefinition = {
 export const mountFields: readonly Field[] = [
   ...cornerMountFields,
   { key: 'plateClearanceWidthMm', label: 'Plate clearance width', min: 40, max: 88, step: 1, unit: 'mm',
-    help: 'Width of the recess along the threaded edge, centered on the screw.' },
+    help: 'Clear span along the threaded edge, centered on the screw. Rounded ends extend beyond it.' },
 ];
-export const mounts: readonly MountDefinition[] = [{
+const squareRecessMount: MountDefinition = {
   ...cornerMount, revision: 6, fields: mountFields,
   defaults: { ...cornerMount.defaults, plateClearanceWidthMm: 72 },
-}];
+};
+export const mounts: readonly MountDefinition[] = [{ ...squareRecessMount, revision: 7 }];
 export const attachments: readonly AttachmentDefinition[] = [
   { id: 'honeycomb', revision: 3, label: 'Honeycomb', description: 'Restricts spill with open hexagonal cells.',
     fields: [...gridFields.map(field => ({ ...field, ...(field.key === 'depth' ? { min: 4.8 } : field.key === 'frame' ? { min: 1.6 } : {}), unit: 'mm' as const })),
@@ -72,7 +73,7 @@ export function resolveDefinition<T extends { id: string; revision: number }>(en
 }
 
 // Historical revisions remain reproducible; they are not choices for new designs.
-export const historicalMounts: readonly MountDefinition[] = [cornerMount, {
+export const historicalMounts: readonly MountDefinition[] = [squareRecessMount, cornerMount, {
   ...cornerMount, revision: 4, label: 'Right corner clips · prototype',
   fields: cornerMountFields.map(field => field.key === 'engagementMm' ? { ...field, min: 16.5 } : field),
   defaults: { ...cornerMount.defaults, engagementMm: 16.5 },

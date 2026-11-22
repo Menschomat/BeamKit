@@ -7,8 +7,8 @@ The latest mount places four compact hooks in the existing corners and leaves bo
 It includes four front seats and access cutouts based on the reference dimensions.
 The editor automatically updates older saved designs to the current model.
 
-The default honeycomb is 113.8 × 63.8 × 28.5 mm and uses 26,618 mm³ of solid
-geometry, about 5.5% less than the initial 28,178 mm³ integrated design. The two
+The default honeycomb is 113.8 × 63.8 × 28.5 mm and uses 26,604 mm³ of solid
+geometry, about 5.6% less than the initial 28,178 mm³ integrated design. The two
 presets have a maximum downward slope below 45° from vertical outside bed
 contact, with zero triangles flagged above 45°. The holder’s deeper sheet pocket
 and tapered seat use more geometric volume than the original prototype holder.

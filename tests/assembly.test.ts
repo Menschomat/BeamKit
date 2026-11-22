@@ -133,7 +133,7 @@ test('the threaded edge clears a flat plate in both mesh exports and the fit cou
   project.attachment.parameters.frame = 5;
   const integrated = generateAssembly(kernel, project);
   const previous = generateAssembly(kernel, {
-    ...project, mount: { id: project.mount!.id, revision: 5, parameters: { ...historicalMounts[0].defaults } },
+    ...project, mount: { id: project.mount!.id, revision: 5, parameters: { ...historicalMounts.find(mount => mount.revision === 5)!.defaults } },
   });
   project.export.format = 'stl';
   project.assembly.mode = 'fit-test';
@@ -150,6 +150,12 @@ test('the threaded edge clears a flat plate in both mesh exports and the fit cou
       try {
         if (part === previous.parts[0]) assert.ok(overlap.volume() > 1);
         else assert.ok(overlap.volume() < 1e-5, part.name);
+        if (part === integrated.parts[0]) {
+          const nearFloor = solid.rayCast([0, -30.6, 9], [49, -30.6, 9])[0].position[0];
+          const nearRim = solid.rayCast([0, -31.8, 9], [49, -31.8, 9])[0].position[0];
+          assert.ok(nearFloor > 37.1 && nearFloor < 37.3);
+          assert.ok(nearRim > 38.2 && nearRim < 38.4);
+        }
       } finally { overlap.delete(); solid.delete(); }
     }
   } finally { seated.delete(); plate.delete(); }
@@ -163,7 +169,7 @@ test('upgrading the earlier tab mount preserves current attachment settings and 
   old.attachment.parameters.depth = 10;
   assert.equal(generateAssembly(kernel, old).parts.length, 1);
   const upgraded = decodeDesign(encodeDesign(old));
-  assert.equal(upgraded.mount!.revision, 6);
+  assert.equal(upgraded.mount!.revision, 7);
   assert.equal(upgraded.assembly.mode, 'fit-test');
   assert.deepEqual(upgraded.attachment, old.attachment);
 });

@@ -238,15 +238,27 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
       solid = project.assembly.mode === 'fit-test' ? collar : own(collar.add(raisedAttachment));
       const plateSeat = lamp.mountingFacts?.plateSeat;
       if (plateSeat && m.plateClearanceWidthMm > 0) {
-        const halfWidth = m.plateClearanceWidthMm / 2;
         const { min, max } = solid.boundingBox();
         // Recess the whole printed edge so a flat plate seats against the threaded boss.
         const cutY = plateSeat.faceY + 0.2;
         if (min[1] < cutY) {
-          solid = own(solid.subtract(box({
-            min: [plateSeat.centerX - halfWidth, min[1] - 1, min[2] - 1],
-            max: [plateSeat.centerX + halfWidth, cutY, max[2] + 1],
-          })));
+          let cutter: Manifold;
+          if (project.mount.revision >= 7) {
+            // Put the arcs outside the requested clear span and extrude parallel to the build axis.
+            const radius = 2.5;
+            const height = cutY - min[1] + 2 * radius + 1;
+            const width = m.plateClearanceWidthMm + 2 * radius;
+            const outline = roundedOutline({ width, height, radius }, 16).map(([x, y]): Point =>
+              [plateSeat.centerX + x, cutY - height / 2 + y]);
+            cutter = extrude(own(new CrossSection([outline])), max[2] - min[2] + 2, min[2] - 1);
+          } else {
+            const halfWidth = m.plateClearanceWidthMm / 2;
+            cutter = box({
+              min: [plateSeat.centerX - halfWidth, min[1] - 1, min[2] - 1],
+              max: [plateSeat.centerX + halfWidth, cutY, max[2] + 1],
+            });
+          }
+          solid = own(solid.subtract(cutter));
         }
       }
       for (const keepout of lamp.keepouts) {
