@@ -18,7 +18,7 @@ export type LampDefinition = DefinitionRef & LampReference & {
 };
 export type MountDefinition = DefinitionRef & {
   label: string; fields: readonly Field[]; defaults: Record<string, number>;
-  strategy?: 'wand-side-clips' | 'wand-slide-on';
+  strategy?: 'wand-side-clips' | 'wand-slide-on' | 'wand-slide-on-rings';
   supportedApertures: ApertureKind[];
 };
 export type ApertureKind = 'rounded-rectangle' | 'circle' | 'polygon';

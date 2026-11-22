@@ -73,7 +73,7 @@ export const tl21cSideClips: MountDefinition = {
   defaults: { ...tl21cFlatSideClips.defaults, frontClearanceMm: 0.8 },
 };
 
-export const tl21cSlideOn: MountDefinition = {
+export const tl21cSlideOnRails: MountDefinition = {
   id: 'neewer.tl21c.slide-on', revision: 1, label: 'Slide-on rails', strategy: 'wand-slide-on',
   fields: [
     { ...fields[0], label: 'Rail clearance per side', help: 'Check that the coupon slides over the end cap and along the housing.' },
@@ -82,4 +82,13 @@ export const tl21cSlideOn: MountDefinition = {
   ],
   defaults: { fitClearancePerSideMm: 0.45, supportThicknessMm: 2.8, frontClearanceMm: 0.8 },
   supportedApertures: ['rounded-rectangle'],
+};
+
+export const tl21cSlideOn: MountDefinition = {
+  ...tl21cSlideOnRails, revision: 2, label: 'Slide-on rings', strategy: 'wand-slide-on-rings',
+  fields: [
+    { ...tl21cSlideOnRails.fields[0], label: 'Ring clearance per side' },
+    { ...tl21cSlideOnRails.fields[1], label: 'Ring thickness' },
+    frontClearance,
+  ],
 };

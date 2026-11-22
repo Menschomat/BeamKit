@@ -33,13 +33,13 @@ test('Neewer selection changes the preview, persists, and exports model-specific
   expect((await couponDownload).suggestedFilename()).toBe('tl21c-clip-fit-test.stl');
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
   const mountStyle = page.getByLabel('Mount style', { exact: true });
-  await mountStyle.selectOption({ label: 'Slide-on rails' });
+  await mountStyle.selectOption({ label: 'Slide-on rings' });
   await expect(clearance).toHaveValue('1.5');
-  await expect(page.getByRole('spinbutton', { name: 'Rail thickness' })).toHaveValue('2.8');
+  await expect(page.getByRole('spinbutton', { name: 'Ring thickness' })).toHaveValue('2.8');
   await expect(exportStl).toBeEnabled();
   const railDownload = page.waitForEvent('download');
   await exportStl.click();
-  expect((await railDownload).suggestedFilename()).toBe('tl21c-slide-on-fit-test.stl');
+  expect((await railDownload).suggestedFilename()).toBe('tl21c-slide-on-rings-fit-test.stl');
   await expect(page.getByRole('status')).toContainText('Saved locally');
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Neewer TL21C' })).toBeVisible();

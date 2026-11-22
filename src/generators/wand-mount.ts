@@ -53,18 +53,21 @@ export function generateWandMount(
     [lip + frame - 0.05, top], [lensShoulder + thickness, -6.5], [shoulder - 1.1 + thickness, -11],
   ];
   const skirt = [...innerFront, ...outerFront.slice().reverse()];
-  const grip = strategy === 'wand-slide-on' ? [
+  const rings = strategy === 'wand-slide-on-rings';
+  const bridgeZ = rings ? -lamp.body.depth - 1.2 : undefined;
+  const ringCenter = aperture.width / 2 - 30;
+  const grip: Point[] | undefined = rings ? undefined : strategy === 'wand-slide-on' ? [
     ...innerFront, [shoulder, -16], [shoulder, -23], [shoulder - 0.5, -29], [shoulder - 1.25, -35],
     [shoulder - 1.85, -38], [shoulder + thickness - 1.85, -38], [shoulder + thickness - 0.6, -34],
     [shoulder + thickness, -28], [shoulder + thickness, -16], ...outerFront.slice().reverse(),
-  ] as Point[] : [
+  ] : [
     ...innerFront, [shoulder, -16], [shoulder, -28], [shoulder - reach, -35],
     [shoulder - reach + 1.3, -38], [shoulder + thickness - 0.4, -38],
     [shoulder + thickness, -35], [shoulder + thickness, -16], ...outerFront.slice().reverse(),
-  ] as Point[];
+  ];
   const gripLength = strategy === 'wand-slide-on' && !fitTest ? 32 : 12;
   const skirtLength = fitTest ? gripLength + 2 : aperture.width - 2 * aperture.radius;
-  const gripCenters = fitTest ? [0] : [-1, 1].map(sign => sign * (aperture.width / 2 - 30));
+  const gripCenters = fitTest ? [0] : [-ringCenter, ringCenter];
   const solids: Manifold[] = [];
   for (const sign of [-1, 1]) {
     function alongLamp(profile: Point[], length: number, center: number) {
@@ -73,7 +76,23 @@ export function generateWandMount(
       return extrudeAlongWand(kernel, scope, contour, length, center);
     }
     solids.push(alongLamp(skirt, skirtLength, 0));
-    for (const center of gripCenters) solids.push(alongLamp(grip, gripLength, center));
+    if (grip) for (const center of gripCenters) solids.push(alongLamp(grip, gripLength, center));
+  }
+  if (bridgeZ !== undefined) {
+    const rearHalfWidth = shoulder - 5.85;
+    const inner: Point[] = [
+      ...innerFront, [shoulder, -16], [shoulder, -23], [shoulder - 0.5, -29], [shoulder - 1.25, -35],
+      [shoulder - 4.9, -44], [rearHalfWidth, bridgeZ],
+    ];
+    const outer: Point[] = [
+      ...outerFront, [shoulder + thickness, -16], [shoulder + thickness, -23], [shoulder - 0.5 + thickness, -29],
+      [shoulder - 1.25 + thickness, -35], [shoulder - 4.9 + thickness, -44],
+      [rearHalfWidth + thickness, bridgeZ - thickness],
+    ];
+    const mirror = (points: Point[]): Point[] => points.map(([y, z]) => [-y, z]);
+    // The tapered walls leave a short transverse bridge at the back of each band.
+    const band = [...inner, ...mirror(inner).reverse(), ...mirror(outer), ...outer.reverse()];
+    for (const center of gripCenters) solids.push(extrudeAlongWand(kernel, scope, band, gripLength, center));
   }
   if (fitTest) {
     // Connect the two tabs through a short, open front rim using the production mating profile.
@@ -87,5 +106,8 @@ export function generateWandMount(
     const raisedRim = scope.own(rimSolid.translate([0, 0, bottom]));
     solids.push(diffuser ? scope.own(raisedRim.subtract(diffuser.solid)) : raisedRim);
   }
-  return scope.own(kernel.Manifold.union(solids));
+  const mount = scope.own(kernel.Manifold.union(solids));
+  // Locate the coupon at the real band position so its preview avoids the control bay.
+  const solid = fitTest && rings ? scope.own(mount.translate([ringCenter, 0, 0])) : mount;
+  return { solid, bridgeZ };
 }

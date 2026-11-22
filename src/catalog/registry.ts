@@ -1,6 +1,6 @@
 import { extraGridPatterns } from './grid-patterns.ts';
 import { p96l } from './p96l.ts';
-import { tl21c, tl21cFlatSideClips, tl21cSideClips, tl21cSlideOn } from './tl21c.ts';
+import { tl21c, tl21cFlatSideClips, tl21cSideClips, tl21cSlideOn, tl21cSlideOnRails } from './tl21c.ts';
 import type { AttachmentDefinition, ConnectionDefinition, Field, LampDefinition, MountDefinition } from '../domain/definitions.ts';
 import { gridFields } from '../geometry/profile.ts';
 
@@ -74,7 +74,7 @@ export function resolveDefinition<T extends { id: string; revision: number }>(en
 }
 
 // Historical revisions remain reproducible; they are not choices for new designs.
-export const historicalMounts: readonly MountDefinition[] = [tl21cFlatSideClips, squareRecessMount, cornerMount, {
+export const historicalMounts: readonly MountDefinition[] = [tl21cFlatSideClips, tl21cSlideOnRails, squareRecessMount, cornerMount, {
   ...cornerMount, revision: 4, label: 'Right corner clips · prototype',
   fields: cornerMountFields.map(field => field.key === 'engagementMm' ? { ...field, min: 16.5 } : field),
   defaults: { ...cornerMount.defaults, engagementMm: 16.5 },

@@ -121,16 +121,18 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     }
     let solid = attachment;
     let attachmentBaseZ = 0;
+    let bridgeZ: number | undefined;
     if (project.mount && wandMount && project.assembly.mode !== 'standalone') {
       const fitTest = project.assembly.mode === 'fit-test';
       const frame = isGridPattern(pattern) ? p.frame : p.wall;
       const cradle = generateWandMount(kernel, scope, lamp, aperture, frame, project.mount.parameters, fitTest, wandMount, diffuser);
+      bridgeZ = cradle.bridgeZ;
       attachmentBaseZ = clearance ?? wandAttachmentBaseZ;
-      if (fitTest) solid = cradle;
+      if (fitTest) solid = cradle.solid;
       else {
         const raised = own(attachment.translate([0, 0, attachmentBaseZ]));
         const grid = diffuser ? own(raised.subtract(diffuser.solid)) : raised;
-        solid = own(cradle.add(grid));
+        solid = own(cradle.solid.add(grid));
       }
     } else if (project.mount && project.assembly.mode !== 'standalone') {
       const m = project.mount.parameters;
@@ -291,7 +293,13 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     if (dfam) solid = own(own(new Manifold(solid.getMesh())).setTolerance(0.0001));
     const checked = validateSolid(solid, scope);
     const printAnalysis = analyzeOverhangs(orientFrontDown(checked.mesh));
-    if (dfam && isGridPattern(pattern) && printAnalysis.steepOverhangAreaMm2 > 0.00001) throw new Error('This configuration exceeds the 45-degree front-down print limit. Adjust the frame, depth or fit settings.');
+    const hasSteepFaces = printAnalysis.steepOverhangAreaMm2 > 0.00001;
+    const knownBridgeZ = bridgeZ;
+    const unplannedOverhang = hasSteepFaces && (knownBridgeZ === undefined || printAnalysis.steepTriangleIndices.some(triangle => {
+      const { positions, indices } = checked.mesh;
+      return [0, 1, 2].some(vertex => Math.abs(positions[indices[triangle * 3 + vertex] * 3 + 2] - knownBridgeZ) > 0.01);
+    }));
+    if (dfam && isGridPattern(pattern) && unplannedOverhang) throw new Error('This configuration exceeds the 45-degree front-down print limit. Adjust the frame, depth or fit settings.');
     let regions: MaterialRegion[] | undefined;
     if (project.export.format === '3mf' && project.mount) {
       // The partition prisms extend past both faces of the already-contoured solid.
@@ -317,11 +325,13 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
       regions = [region('honeycomb', grid), region('liner', liner), region('shell', shell)];
     }
     const diagnostics = printDiagnostics(project);
-    if (printAnalysis.steepOverhangAreaMm2 > 0.00001) diagnostics.push({ level: 'warning', code: 'overhangs', message: 'This revision has downward-facing ledges. Inspect bridging and supports in your slicer; support-free printing is not verified.' });
-    const slideOn = wandMount === 'wand-slide-on' && project.assembly.mode !== 'standalone';
+    if (bridgeZ !== undefined) diagnostics.push({ level: 'info', code: 'ring-bridge', message: 'The rear of each ring bridges across the housing. Check bridge direction and sag with the fit coupon.' });
+    if (unplannedOverhang) diagnostics.push({ level: 'warning', code: 'overhangs', message: 'This revision has downward-facing ledges. Inspect bridging and supports in your slicer; support-free printing is not verified.' });
+    const slideOn = bridgeZ !== undefined ? 'slide-on-rings'
+      : wandMount === 'wand-slide-on' && project.assembly.mode !== 'standalone' ? 'slide-on' : '';
     const name = project.assembly.mode === 'fit-test'
-      ? `${prefix}-${slideOn ? 'slide-on' : wandMount ? 'clip' : 'collar'}-fit-test`
-      : `${prefix}-${slideOn ? 'slide-on-' : ''}${project.attachment.id}`;
+      ? `${prefix}-${slideOn || (wandMount ? 'clip' : 'collar')}-fit-test`
+      : `${prefix}-${slideOn ? slideOn + '-' : ''}${project.attachment.id}`;
     return { parts: [{ name, ...checked, transform: [0, 0, 0] }], regions, diagnostics, elapsedMs: performance.now() - start, projectRevision, lampId: lamp.id, provenance: project.engine, connection: null, printAnalysis };
   } finally { scope.dispose(); }
 }

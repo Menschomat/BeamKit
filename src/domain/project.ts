@@ -109,7 +109,7 @@ export function printDiagnostics(project: Design): Diagnostic[] {
       project.mount.parameters.retainingLipMm <= project.mount.parameters.fitClearancePerSideMm) {
     notes.push({ level: 'warning', code: 'wand-hook-overlap', message: 'The clips do not reach behind the modeled shoulder at this clearance. Adjust hook reach and print a fit coupon.' });
   }
-  if (strategy === 'wand-slide-on') {
+  if (strategy === 'wand-slide-on' || strategy === 'wand-slide-on-rings') {
     notes.push({ level: 'warning', code: 'slide-on-retention', message: 'Both ends are open. Check sliding clearance and axial retention on the lamp before use.' });
   }
   return notes;
@@ -126,6 +126,7 @@ function useCurrentDesign(project: Design): Design {
 
   const originalGrid = project.attachment.id === 'honeycomb' && project.attachment.revision === 1;
   const next = createDesign('stl', resolveDefinition(lamps, project.lamp));
+  if (olderMount && mount) next.mount = { id: mount.id, revision: mount.revision, parameters: { ...mount.defaults } };
   next.name = project.name;
   next.lamp = project.lamp;
   next.printProfile = project.printProfile;

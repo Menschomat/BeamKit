@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Module from 'manifold-3d';
-import { tl21c, tl21cSlideOn } from '../src/catalog/tl21c.ts';
+import { tl21c, tl21cSlideOn, tl21cSlideOnRails } from '../src/catalog/tl21c.ts';
 import { attachments } from '../src/catalog/registry.ts';
 import { createDesign, decodeDesign, encodeDesign, validateDesign } from '../src/domain/project.ts';
 import { generateAssembly } from '../src/generators/assembly.ts';
@@ -89,10 +89,13 @@ test('older TL21C projects upgrade the curved mount and preserve clip settings',
   assert.equal(upgraded.export.format, '3mf');
 });
 
-test('slide-on rails clear the modeled insertion path and overlap its shoulders', () => {
+test('slide-on rings clear the modeled insertion path and close around the back', () => {
   const project = createDesign('3mf', tl21c);
   project.mount = { id: tl21cSlideOn.id, revision: tl21cSlideOn.revision, parameters: { ...tl21cSlideOn.defaults } };
   assert.deepEqual(decodeDesign(encodeDesign(project)), project);
+  const old = { ...project, mount: { ...project.mount, revision: tl21cSlideOnRails.revision } };
+  assert.equal(decodeDesign(encodeDesign(old)).mount?.revision, tl21cSlideOn.revision);
+  assert.equal(generateAssembly(kernel, old).parts[0].name, 'tl21c-slide-on-honeycomb');
   const scope = new SolidScope();
   const own = scope.own.bind(scope);
   try {
@@ -108,10 +111,13 @@ test('slide-on rails clear the modeled insertion path and overlap its shoulders'
       project.export.format = mode === 'integrated' ? '3mf' : 'stl';
       const result = generateAssembly(kernel, project);
       const { mesh, bounds, name, volumeMm3 } = result.parts[0];
-      assert.equal(name, mode === 'integrated' ? 'tl21c-slide-on-honeycomb' : 'tl21c-slide-on-fit-test');
-      assert.equal(result.printAnalysis!.steepOverhangAreaMm2, 0);
+      assert.equal(name, mode === 'integrated' ? 'tl21c-slide-on-rings-honeycomb' : 'tl21c-slide-on-rings-fit-test');
+      const bandCount = mode === 'integrated' ? 2 : 1;
+      assert.ok(Math.abs(result.printAnalysis!.steepOverhangAreaMm2 - bandCount * 30.8 * 12) < 0.01);
+      assert.ok(result.diagnostics.some(note => note.code === 'ring-bridge'));
+      assert.ok(result.diagnostics.every(note => note.code !== 'overhangs'));
       assert.ok(result.printAnalysis!.bedContactAreaMm2 > 100);
-      assert.ok(bounds.min[0] > -114 && bounds.max[0] < 114 && bounds.min[2] > -40);
+      assert.ok(bounds.min[0] > -114 && bounds.max[0] < 114 && bounds.min[2] < -48);
       assert.ok(result.diagnostics.some(note => note.code === 'slide-on-retention'));
       if (mode === 'integrated') {
         assert.equal(result.regions?.length, 3);
@@ -119,17 +125,15 @@ test('slide-on rails clear the modeled insertion path and overlap its shoulders'
       } else {
         assert.ok(bounds.max[0] - bounds.min[0] < 20);
       }
-      const rail = own(new kernel.Manifold(new kernel.Mesh({ numProp: 3, vertProperties: mesh.positions, triVerts: mesh.indices })));
+      const rings = own(new kernel.Manifold(new kernel.Mesh({ numProp: 3, vertProperties: mesh.positions, triVerts: mesh.indices })));
       for (const x of [-210, -110, -50, 0, 50, 110, 210]) {
         const insertion = own(lamp.translate([x, 0, 0]));
-        assert.ok(own(rail.intersect(insertion)).volume() < 0.01, `Lamp overlaps the rail at X=${x}`);
+        assert.ok(own(rings.intersect(insertion)).volume() < 0.01, `Lamp overlaps the band at X=${x}`);
       }
-      // The back edges still extend inboard of the widest part of the housing.
-      const x = mode === 'integrated' ? 79 : 0;
-      const [leftOutside, leftInside, rightInside, rightOutside] = rail.rayCast([x, -30, -37], [x, 30, -37]);
-      assert.ok(leftOutside && rightOutside);
-      assert.ok(leftInside.position[1] > -tl21c.body.height / 2);
-      assert.ok(rightInside.position[1] < tl21c.body.height / 2);
+      // There is a rear strap at each band and open access through the center of the lamp.
+      assert.equal(rings.rayCast([79, 0, -60], [79, 0, -43]).length, 2);
+      assert.equal(rings.rayCast([-79, 0, -60], [-79, 0, -43]).length, mode === 'integrated' ? 2 : 0);
+      assert.equal(rings.rayCast([0, 0, -60], [0, 0, -43]).length, 0);
     }
   } finally { scope.dispose(); }
 });
