@@ -60,3 +60,10 @@ The current design uses all four existing brackets. The hook strips start at
 16.5 mm, with a shorter insertion ramp and unchanged hook reach. The reference
 rear face reaches approximately X = ±53.5 mm around Y = ±24.5 mm, where the
 default hooks provide overlap. Check snap force and release on the fit coupon.
+
+Revision 6 recesses the printed rim along the threaded edge. The reference
+seating face is at Y = −30.5 mm, centered at X = 0. The rim ends 0.2 mm inside
+that plane across a default 72 mm span. The Fit panel adjusts the span from 40
+to 88 mm along the lamp edge. The recess extends through the full printed
+depth, and the fit coupon includes it. Check that the intended plate seats
+flush and that its screw engages on the physical lamp.

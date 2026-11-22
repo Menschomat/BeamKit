@@ -7,13 +7,19 @@ The latest mount places four compact hooks in the existing corners and leaves bo
 It includes four front seats and access cutouts based on the reference dimensions.
 The editor automatically updates older saved designs to the current model.
 
-The default honeycomb is 113.8 × 63.8 × 28.5 mm and uses 26,946 mm³ of solid
-geometry, about 4.4% less than the initial 28,178 mm³ integrated design. The two
+The default honeycomb is 113.8 × 63.8 × 28.5 mm and uses 26,618 mm³ of solid
+geometry, about 5.5% less than the initial 28,178 mm³ integrated design. The two
 presets have a maximum downward slope below 45° from vertical outside bed
 contact, with zero triangles flagged above 45°. The holder’s deeper sheet pocket
 and tapered seat use more geometric volume than the original prototype holder.
 These checks measure mesh geometry. Slicer toolpaths and real print behavior
 remain to be checked. See [print tests](PRINT_TESTS.md).
+
+The user reported that the previous four-corner print worked well. Photos
+showed the printed rim extending past the threaded seat. The revised rim
+clears the modeled flat plate footprint. Bambu Studio CLI loaded the updated
+STL as one manifold part placed at Z = 0. Fit with a larger plate still needs
+a hardware check.
 
 Multicolor mode partitions the same honeycomb solid into three closed regions
 with no bulk overlap. The [Core 3MF](https://3mf.io/spec/core-v1-3-0/) package

@@ -3,7 +3,7 @@ import test from 'node:test';
 import Module from 'manifold-3d';
 import { generateAssembly } from '../src/generators/assembly.ts';
 import { createDesign, decodeDesign, encodeDesign, validateDesign } from '../src/domain/project.ts';
-import { attachments, lamps, mountFields } from '../src/catalog/registry.ts';
+import { attachments, historicalMounts, lamps, mountFields } from '../src/catalog/registry.ts';
 import { encodeProject } from '../src/project.ts';
 import { defaultGrid } from '../src/geometry/profile.ts';
 const kernel = await Module(); kernel.setup();
@@ -50,7 +50,7 @@ test('settings preserve revisions and reject unsupported definitions and modes',
   assert.throws(() => validateDesign(modular), /invalid project/);
 });
 test('a synthetic lamp exercises the generator without a P96L geometry branch', () => {
-  const fixture = { ...lamps[0], id: 'test.synthetic.rectangle', body: { width: 90, height: 50, depth: 10, radius: 5 }, aperture: { width: 84, height: 44, radius: 3 }, keepouts: [] };
+  const fixture = { ...lamps[0], id: 'test.synthetic.rectangle', body: { width: 90, height: 50, depth: 10, radius: 5 }, aperture: { width: 84, height: 44, radius: 3 }, mountingFacts: undefined, keepouts: [] };
   const project = createDesign();
   const part = generateAssembly(kernel, project, 0, fixture).parts[0];
   assert.ok(Math.abs(part.bounds.max[0] - 46.9) < 0.001);
@@ -92,7 +92,7 @@ test('print-optimized honeycomb preserves the footprint and eliminates steep loc
   assert.ok(result.printAnalysis!.maxOverhangDegrees <= 45);
   const old = createDesign(); old.engine.generatorVersion = '0.2.0';
   old.mount!.revision = 1;
-  Object.assign(old.mount!.parameters, { engagementMm: 12.5, retainingLipMm: 0.4, accessCutoutWidthMm: 76 });
+  old.mount!.parameters = { ...historicalMounts.find(mount => mount.revision === 1)!.defaults };
   old.attachment.revision = 2; old.attachment.parameters.frame = 2;
   const baseline = generateAssembly(kernel, old).parts[0];
   const revised = result.parts[0];
@@ -105,7 +105,9 @@ test('print-optimized honeycomb preserves the footprint and eliminates steep loc
 });
 
 test('four corner hooks catch the modeled shoulder and leave the short edges open', () => {
-  const { mesh } = generateAssembly(kernel, createDesign()).parts[0];
+  const project = createDesign();
+  project.mount!.parameters.plateClearanceWidthMm = 88;
+  const { mesh } = generateAssembly(kernel, project).parts[0];
   const solid = new kernel.Manifold(new kernel.Mesh({
     numProp: 3, vertProperties: mesh.positions, triVerts: mesh.indices,
   }));
@@ -125,15 +127,43 @@ test('four corner hooks catch the modeled shoulder and leave the short edges ope
   } finally { solid.delete(); }
 });
 
+test('the threaded edge clears a flat plate in both mesh exports and the fit coupon', () => {
+  const project = createDesign();
+  project.export.format = '3mf';
+  project.attachment.parameters.frame = 5;
+  const integrated = generateAssembly(kernel, project);
+  const previous = generateAssembly(kernel, {
+    ...project, mount: { id: project.mount!.id, revision: 5, parameters: { ...historicalMounts[0].defaults } },
+  });
+  project.export.format = 'stl';
+  project.assembly.mode = 'fit-test';
+  const fitTest = generateAssembly(kernel, project);
+
+  const plate = kernel.Manifold.cube([72, 10, 45]);
+  const seated = plate.translate([-36, -40.5, -20]);
+  try {
+    for (const part of [...integrated.parts, ...integrated.regions!, ...fitTest.parts, ...previous.parts]) {
+      const solid = new kernel.Manifold(new kernel.Mesh({
+        numProp: 3, vertProperties: part.mesh.positions, triVerts: part.mesh.indices,
+      }));
+      const overlap = solid.intersect(seated);
+      try {
+        if (part === previous.parts[0]) assert.ok(overlap.volume() > 1);
+        else assert.ok(overlap.volume() < 1e-5, part.name);
+      } finally { overlap.delete(); solid.delete(); }
+    }
+  } finally { seated.delete(); plate.delete(); }
+});
+
 test('upgrading the earlier tab mount preserves current attachment settings and output mode', () => {
   const old = createDesign();
   old.mount!.revision = 3;
-  Object.assign(old.mount!.parameters, { engagementMm: 14.5, retainingLipMm: 1.3 });
+  old.mount!.parameters = { ...historicalMounts.find(mount => mount.revision === 3)!.defaults };
   old.assembly.mode = 'fit-test';
   old.attachment.parameters.depth = 10;
   assert.equal(generateAssembly(kernel, old).parts.length, 1);
   const upgraded = decodeDesign(encodeDesign(old));
-  assert.equal(upgraded.mount!.revision, 5);
+  assert.equal(upgraded.mount!.revision, 6);
   assert.equal(upgraded.assembly.mode, 'fit-test');
   assert.deepEqual(upgraded.attachment, old.attachment);
 });

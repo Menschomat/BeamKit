@@ -10,7 +10,11 @@ export type LampDefinition = DefinitionRef & LampReference & {
   provenance: { source: string; confidence: 'reference-only' | 'measured'; note: string };
   keepouts: { id: string; bounds: Bounds; confidence: 'provisional' | 'measured' }[];
   mounts: string[];
-  mountingFacts?: { rightSideInsetMm: number; rearFaceInsetMm: number };
+  mountingFacts?: {
+    rightSideInsetMm: number;
+    rearFaceInsetMm: number;
+    plateSeat?: { centerX: number; faceY: number };
+  };
 };
 export type MountDefinition = DefinitionRef & {
   label: string; fields: readonly Field[]; defaults: Record<string, number>;

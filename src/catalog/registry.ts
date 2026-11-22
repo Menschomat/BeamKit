@@ -3,7 +3,7 @@ import { p96l } from './p96l.ts';
 import type { AttachmentDefinition, ConnectionDefinition, Field, LampDefinition, MountDefinition } from '../domain/definitions.ts';
 import { gridFields } from '../geometry/profile.ts';
 
-export const mountFields: readonly Field[] = [
+const cornerMountFields: readonly Field[] = [
   { key: 'fitClearancePerSideMm', label: 'Fit clearance per side', min: 0.15, max: 1, step: 0.05, unit: 'mm', help: 'Gap on each side of the lamp housing. Start with the fit test.' },
   { key: 'engagementMm', label: 'Corner clip depth', min: 14.5, max: 19, step: 0.5, unit: 'mm' },
   { key: 'supportThicknessMm', label: 'Support thickness', min: 1.6, max: 3.2, step: 0.4, unit: 'mm' },
@@ -11,11 +11,20 @@ export const mountFields: readonly Field[] = [
   { key: 'retainingLipMm', label: 'Hook reach', min: 1.8, max: 2.6, step: 0.1, unit: 'mm', help: 'Sets how far the spring hooks reach behind the lamp. Retention needs print testing.' },
   { key: 'accessCutoutWidthMm', label: 'Control access width', min: 60, max: 85, step: 1, unit: 'mm', help: 'Open access on both long sides. Positions are provisional.' },
 ];
-export const mounts: readonly MountDefinition[] = [{
-  id: 'smallrig.p96l.collar', revision: 5, label: 'Four corner clips · prototype', fields: mountFields,
+const cornerMount: MountDefinition = {
+  id: 'smallrig.p96l.collar', revision: 5, label: 'Four corner clips · prototype', fields: cornerMountFields,
   defaults: { fitClearancePerSideMm: 0.3, engagementMm: 14.5, supportThicknessMm: 1.6,
     diffuserClearanceMm: 0.8, retainingLipMm: 2.1, accessCutoutWidthMm: 85 },
   supportedApertures: ['rounded-rectangle'],
+};
+export const mountFields: readonly Field[] = [
+  ...cornerMountFields,
+  { key: 'plateClearanceWidthMm', label: 'Plate clearance width', min: 40, max: 88, step: 1, unit: 'mm',
+    help: 'Width of the recess along the threaded edge, centered on the screw.' },
+];
+export const mounts: readonly MountDefinition[] = [{
+  ...cornerMount, revision: 6, fields: mountFields,
+  defaults: { ...cornerMount.defaults, plateClearanceWidthMm: 72 },
 }];
 export const attachments: readonly AttachmentDefinition[] = [
   { id: 'honeycomb', revision: 3, label: 'Honeycomb', description: 'Restricts spill with open hexagonal cells.',
@@ -40,7 +49,7 @@ export const lamps: readonly LampDefinition[] = [{ ...p96l,
   provenance: { source: 'Reference-model dimensions recorded in PROJECT_PLAN.md', confidence: 'reference-only',
     note: 'Housing and aperture dimensions have not been checked against a physical lamp. Preview is independently procedural.' },
   mounts: ['smallrig.p96l.collar'],
-  mountingFacts: { rightSideInsetMm: 0.8, rearFaceInsetMm: 1.5 },
+  mountingFacts: { rightSideInsetMm: 0.8, rearFaceInsetMm: 1.5, plateSeat: { centerX: 0, faceY: -30.5 } },
   keepouts: [
     // Conservative access volumes from private reference measurements, expanded for use.
     { id: 'usb-cable-access', bounds: { min: [-49, -50, -13.5], max: [-29, -26, 0.4] }, confidence: 'provisional' },
@@ -63,18 +72,18 @@ export function resolveDefinition<T extends { id: string; revision: number }>(en
 }
 
 // Historical revisions remain reproducible; they are not choices for new designs.
-export const historicalMounts: readonly MountDefinition[] = [{
-  ...mounts[0], revision: 4, label: 'Right corner clips · prototype',
-  fields: mountFields.map(field => field.key === 'engagementMm' ? { ...field, min: 16.5 } : field),
-  defaults: { ...mounts[0].defaults, engagementMm: 16.5 },
+export const historicalMounts: readonly MountDefinition[] = [cornerMount, {
+  ...cornerMount, revision: 4, label: 'Right corner clips · prototype',
+  fields: cornerMountFields.map(field => field.key === 'engagementMm' ? { ...field, min: 16.5 } : field),
+  defaults: { ...cornerMount.defaults, engagementMm: 16.5 },
 }, {
-  ...mounts[0], revision: 3, label: 'Two-tab click mount · prototype',
-  fields: mountFields.map(field => field.key === 'engagementMm'
+  ...cornerMount, revision: 3, label: 'Two-tab click mount · prototype',
+  fields: cornerMountFields.map(field => field.key === 'engagementMm'
     ? { ...field, label: 'Spring tab length', min: 14, max: 18 }
     : field.key === 'retainingLipMm' ? { ...field, min: 0.8, max: 1.6 } : field),
-  defaults: { ...mounts[0].defaults, engagementMm: 14.5, retainingLipMm: 1.3 },
-}, { ...mounts[0], revision: 2, fields: mounts[0].fields.map(f => f.key === 'engagementMm' ? { ...f, min: 4, max: 13 } : f.key === 'retainingLipMm' ? { ...f, min: 0, max: 0.8 } : f), defaults: { ...mounts[0].defaults, engagementMm: 12.5, retainingLipMm: 0.4 } }, { ...mounts[0], revision: 1, fields: mounts[0].fields.map(f => f.key === 'engagementMm' ? { ...f, min: 4, max: 13 } : f.key === 'retainingLipMm' ? { ...f, min: 0, max: 0.8 } : f),
-  defaults: { ...mounts[0].defaults, engagementMm: 12.5, retainingLipMm: 0.4, accessCutoutWidthMm: 76 } }];
+  defaults: { ...cornerMount.defaults, engagementMm: 14.5, retainingLipMm: 1.3 },
+}, { ...cornerMount, revision: 2, fields: cornerMountFields.map(f => f.key === 'engagementMm' ? { ...f, min: 4, max: 13 } : f.key === 'retainingLipMm' ? { ...f, min: 0, max: 0.8 } : f), defaults: { ...cornerMount.defaults, engagementMm: 12.5, retainingLipMm: 0.4 } }, { ...cornerMount, revision: 1, fields: cornerMountFields.map(f => f.key === 'engagementMm' ? { ...f, min: 4, max: 13 } : f.key === 'retainingLipMm' ? { ...f, min: 0, max: 0.8 } : f),
+  defaults: { ...cornerMount.defaults, engagementMm: 12.5, retainingLipMm: 0.4, accessCutoutWidthMm: 76 } }];
 export const historicalAttachments: readonly AttachmentDefinition[] = [
   { ...attachments[0], revision: 2, defaults: { ...attachments[0].defaults, frame: 2 }, fields: [...gridFields.map(field => ({ ...field, unit: 'mm' as const })), ...attachments[0].fields.slice(4)] },
   { ...attachments[1], revision: 1, fields: attachments[1].fields.map(field => field.key === 'depth' ? { ...field, min: 3.2 } : field), defaults: { ...attachments[1].defaults, depth: 4 } },

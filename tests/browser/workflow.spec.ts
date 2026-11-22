@@ -101,7 +101,8 @@ test('an older autosave opens the current corner model without an upgrade banner
         const request = store.get('_autosave');
         request.onsuccess = () => {
           const old = JSON.parse(request.result);
-          old.mount.revision = 4;
+          old.mount.revision = 5;
+          delete old.mount.parameters.plateClearanceWidthMm;
           old.mount.parameters.engagementMm = 16.5;
           old.attachment.parameters.depth = 17;
           store.put(JSON.stringify(old), '_autosave');
@@ -117,7 +118,8 @@ test('an older autosave opens the current corner model without an upgrade banner
   await expect(page.getByText('The new mount uses smaller hooks on all four corners.')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Use four corner clips' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'Corner clip depth', exact: true })).toHaveValue('14.5');
+  await expect(page.getByRole('spinbutton', { name: 'Corner clip depth', exact: true })).toHaveValue('16.5');
+  await expect(page.getByRole('spinbutton', { name: 'Plate clearance width', exact: true })).toHaveValue('72');
 });
 
 test('multicolor mode downloads a 3MF, survives reload, and can switch back to STL', async ({ page }) => {

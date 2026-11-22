@@ -130,14 +130,16 @@ function useCurrentDesign(project: Design): Design {
   if (project.mount && next.mount) {
     if (olderMount) {
       const { engagementMm, retainingLipMm } = next.mount.parameters;
-      next.mount.parameters = { ...project.mount.parameters, engagementMm,
-        retainingLipMm: project.mount.revision === 4 ? project.mount.parameters.retainingLipMm : retainingLipMm };
+      next.mount.parameters = { ...next.mount.parameters, ...project.mount.parameters };
+      if (project.mount.revision < 5) next.mount.parameters.engagementMm = engagementMm;
+      if (project.mount.revision < 4) next.mount.parameters.retainingLipMm = retainingLipMm;
     } else {
       next.mount = project.mount;
     }
   } else if (!originalGrid) {
     next.mount = null;
   }
+  if (project.mount?.revision === 5) next.export.orientation = project.export.orientation;
   if (project.export.format === '3mf' && supportsMulticolor(next)) next.export.format = '3mf';
   return validateDesign(next);
 }

@@ -236,6 +236,19 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
       for (const keepout of lamp.keepouts) collar = own(collar.subtract(box({ min: [keepout.bounds.min[0], keepout.bounds.min[1], project.mount.revision >= 3 ? Math.min(keepout.bounds.min[2], -m.engagementMm - 1) : keepout.bounds.min[2]], max: keepout.bounds.max })));
       const raisedAttachment = own(attachment.translate([0, 0, m.diffuserClearanceMm + thickness - 0.4]));
       solid = project.assembly.mode === 'fit-test' ? collar : own(collar.add(raisedAttachment));
+      const plateSeat = lamp.mountingFacts?.plateSeat;
+      if (plateSeat && m.plateClearanceWidthMm > 0) {
+        const halfWidth = m.plateClearanceWidthMm / 2;
+        const { min, max } = solid.boundingBox();
+        // Recess the whole printed edge so a flat plate seats against the threaded boss.
+        const cutY = plateSeat.faceY + 0.2;
+        if (min[1] < cutY) {
+          solid = own(solid.subtract(box({
+            min: [plateSeat.centerX - halfWidth, min[1] - 1, min[2] - 1],
+            max: [plateSeat.centerX + halfWidth, cutY, max[2] + 1],
+          })));
+        }
+      }
       for (const keepout of lamp.keepouts) {
         const overlap = own(solid.intersect(box(keepout.bounds)));
         if (overlap.volume() > 1e-5) throw new Error(`Geometry blocks ${keepout.id}. Increase front clearance or use a compatible configuration.`);
