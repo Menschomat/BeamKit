@@ -61,8 +61,8 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
         diagnostics: printDiagnostics(project), elapsedMs: performance.now() - start, projectRevision, lampId: lamp.id, provenance: project.engine, connection: null };
     }
     const p = project.attachment.parameters;
-    const wandMount = project.mount && mountDefinition(project.mount).strategy === 'wand-side-clips';
-    const dfam = wandMount || (project.mount?.revision ?? 0) >= 2;
+    const wandMount = project.mount ? mountDefinition(project.mount).strategy : undefined;
+    const dfam = Boolean(wandMount) || (project.mount?.revision ?? 0) >= 2;
     const inset = p.inset ?? 0;
     const aperture = { width: lamp.aperture.width - inset * 2, height: lamp.aperture.height - inset * 2, radius: Math.max(0.5, lamp.aperture.radius - inset) };
     let attachment: Manifold;
@@ -124,7 +124,7 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     if (project.mount && wandMount && project.assembly.mode !== 'standalone') {
       const fitTest = project.assembly.mode === 'fit-test';
       const frame = isGridPattern(pattern) ? p.frame : p.wall;
-      const cradle = generateWandMount(kernel, scope, lamp, aperture, frame, project.mount.parameters, fitTest, diffuser);
+      const cradle = generateWandMount(kernel, scope, lamp, aperture, frame, project.mount.parameters, fitTest, wandMount, diffuser);
       attachmentBaseZ = clearance ?? wandAttachmentBaseZ;
       if (fitTest) solid = cradle;
       else {
@@ -318,7 +318,10 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     }
     const diagnostics = printDiagnostics(project);
     if (printAnalysis.steepOverhangAreaMm2 > 0.00001) diagnostics.push({ level: 'warning', code: 'overhangs', message: 'This revision has downward-facing ledges. Inspect bridging and supports in your slicer; support-free printing is not verified.' });
-    const name = project.assembly.mode === 'fit-test' ? `${prefix}-${wandMount ? 'clip' : 'collar'}-fit-test` : `${prefix}-${project.attachment.id}`;
+    const slideOn = wandMount === 'wand-slide-on' && project.assembly.mode !== 'standalone';
+    const name = project.assembly.mode === 'fit-test'
+      ? `${prefix}-${slideOn ? 'slide-on' : wandMount ? 'clip' : 'collar'}-fit-test`
+      : `${prefix}-${slideOn ? 'slide-on-' : ''}${project.attachment.id}`;
     return { parts: [{ name, ...checked, transform: [0, 0, 0] }], regions, diagnostics, elapsedMs: performance.now() - start, projectRevision, lampId: lamp.id, provenance: project.engine, connection: null, printAnalysis };
   } finally { scope.dispose(); }
 }

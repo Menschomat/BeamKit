@@ -104,9 +104,13 @@ export function printDiagnostics(project: Design): Diagnostic[] {
       project.mount.parameters.retainingLipMm <= 1.5 + project.mount.parameters.fitClearancePerSideMm) {
     notes.push({ level: 'warning', code: 'corner-overlap', message: 'Hook reach does not overlap the modeled rear shoulder at this clearance. Increase hook reach or reduce fit clearance.' });
   }
-  if (project.assembly.mode !== 'standalone' && project.mount && mountDefinition(project.mount).strategy === 'wand-side-clips' &&
+  const strategy = project.mount && project.assembly.mode !== 'standalone' ? mountDefinition(project.mount).strategy : undefined;
+  if (strategy === 'wand-side-clips' && project.mount &&
       project.mount.parameters.retainingLipMm <= project.mount.parameters.fitClearancePerSideMm) {
     notes.push({ level: 'warning', code: 'wand-hook-overlap', message: 'The clips do not reach behind the modeled shoulder at this clearance. Adjust hook reach and print a fit coupon.' });
+  }
+  if (strategy === 'wand-slide-on') {
+    notes.push({ level: 'warning', code: 'slide-on-retention', message: 'Both ends are open. Check sliding clearance and axial retention on the lamp before use.' });
   }
   return notes;
 }
@@ -145,7 +149,7 @@ function useCurrentDesign(project: Design): Design {
     if (olderMount) {
       const { engagementMm, retainingLipMm } = next.mount.parameters;
       next.mount.parameters = { ...next.mount.parameters, ...project.mount.parameters };
-      if (mount?.strategy !== 'wand-side-clips') {
+      if (!mount?.strategy) {
         if (project.mount.revision < 5) next.mount.parameters.engagementMm = engagementMm;
         if (project.mount.revision < 4) next.mount.parameters.retainingLipMm = retainingLipMm;
       }
@@ -155,7 +159,7 @@ function useCurrentDesign(project: Design): Design {
   } else if (!originalGrid) {
     next.mount = null;
   }
-  if (project.mount && (!olderMount || mount?.strategy === 'wand-side-clips' || project.mount.revision >= 5)) {
+  if (project.mount && (!olderMount || mount?.strategy || project.mount.revision >= 5)) {
     next.export.orientation = project.export.orientation;
   }
   if (project.export.format === '3mf' && supportsMulticolor(next)) next.export.format = '3mf';

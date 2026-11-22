@@ -41,7 +41,7 @@ export const tl21c: LampDefinition = {
     confidence: 'reference-only',
     note: 'Clip contact dimensions and aperture are estimates. See docs/TL21C_MEASUREMENTS.md.',
   },
-  mounts: ['neewer.tl21c.side-clips'],
+  mounts: ['neewer.tl21c.side-clips', 'neewer.tl21c.slide-on'],
   keepouts: [
     { id: 'rear-usb-and-controls', bounds: { min: [-65, -28, -65], max: [45, 28, -40] }, confidence: 'provisional' },
     { id: 'left-end-thread', bounds: { min: [-133, -25, -48], max: [-114, 25, 3] }, confidence: 'provisional' },
@@ -71,4 +71,15 @@ const frontClearance: Field = {
 export const tl21cSideClips: MountDefinition = {
   ...tl21cFlatSideClips, revision: 2, fields: [...fields, frontClearance],
   defaults: { ...tl21cFlatSideClips.defaults, frontClearanceMm: 0.8 },
+};
+
+export const tl21cSlideOn: MountDefinition = {
+  id: 'neewer.tl21c.slide-on', revision: 1, label: 'Slide-on rails', strategy: 'wand-slide-on',
+  fields: [
+    { ...fields[0], label: 'Rail clearance per side', help: 'Check that the coupon slides over the end cap and along the housing.' },
+    { key: 'supportThicknessMm', label: 'Rail thickness', min: 2.4, max: 3.6, step: 0.4, unit: 'mm' },
+    frontClearance,
+  ],
+  defaults: { fitClearancePerSideMm: 0.45, supportThicknessMm: 2.8, frontClearanceMm: 0.8 },
+  supportedApertures: ['rounded-rectangle'],
 };

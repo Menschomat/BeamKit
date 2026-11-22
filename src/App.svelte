@@ -6,7 +6,7 @@
   import ParameterField from './app/ParameterField.svelte';
   import LampPicker from './app/LampPicker.svelte';
   import { isGridPattern } from './catalog/grid-patterns.ts';
-  import { attachments, lamps, resolveDefinition } from './catalog/registry.ts';
+  import { attachments, lamps, mounts, resolveDefinition } from './catalog/registry.ts';
   import { attachmentDefinition, createDesign, decodeDesign, defaultMountForLamp, encodeDesign, mountDefinition, printDiagnostics, supportsMulticolor, validateDesign } from './domain/project.ts';
   import type { Design } from './domain/project.ts';
   import { orientFrontDown } from './geometry/printability.ts';
@@ -54,6 +54,7 @@
   let saveTimer: ReturnType<typeof setTimeout>;
   const selectedLamp = $derived(resolveDefinition(lamps, project.lamp));
   const selectedMount = $derived(project.mount ? mountDefinition(project.mount) : null);
+  const compatibleMounts = $derived(mounts.filter(mount => selectedLamp.mounts.includes(mount.id)));
   const exportPrefix = $derived(selectedLamp.id.split('.').at(-1));
   const definition = $derived(attachmentDefinition(project));
   const previewResult = $derived(result?.lampId === selectedLamp.id ? result : null);
@@ -107,6 +108,16 @@
     remember(); project.assembly.mode = mode;
     if (mode !== 'standalone' && !project.mount) project.mount = defaultMountForLamp(selectedLamp);
     if (!supportsMulticolor(project)) project.export.format = 'stl';
+    rebuild();
+  }
+  function changeMount(id: string) {
+    const mount = compatibleMounts.find(option => option.id === id);
+    if (!mount || project.mount?.id === id) return;
+    const clearance = project.mount?.parameters.frontClearanceMm;
+    const parameters = { ...mount.defaults };
+    if (clearance !== undefined && 'frontClearanceMm' in parameters) parameters.frontClearanceMm = clearance;
+    remember();
+    project.mount = { id: mount.id, revision: mount.revision, parameters };
     rebuild();
   }
   function changeMulticolor(enabled: boolean) {
@@ -295,6 +306,14 @@
             onchange={event => changeAttachment(event.currentTarget.value,
               isGridPattern(project.attachment.id) && isGridPattern(event.currentTarget.value))}>
             {#each attachments as attachment}<option value={attachment.id}>{attachment.label}</option>{/each}
+          </select>
+        </div>
+      {:else if settingsTab === 'mount' && project.assembly.mode !== 'standalone' && compatibleMounts.length > 1}
+        <div class="parameter">
+          <label class="section-heading" for="mount-style">Mount style</label>
+          <select id="mount-style" disabled={booting} value={project.mount?.id}
+            onchange={event => changeMount(event.currentTarget.value)}>
+            {#each compatibleMounts as mount}<option value={mount.id}>{mount.label}</option>{/each}
           </select>
         </div>
       {/if}

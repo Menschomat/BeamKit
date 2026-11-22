@@ -1,5 +1,5 @@
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
-import type { LampDefinition } from '../domain/definitions.ts';
+import type { LampDefinition, MountDefinition } from '../domain/definitions.ts';
 import type { Aperture, Point } from '../geometry/profile.ts';
 import { roundedOutline } from '../geometry/profile.ts';
 import { lampApertureZ } from '../geometry/lamp-reference.ts';
@@ -39,6 +39,7 @@ export function generateWandMount(
   frame: number,
   parameters: Record<string, number>,
   fitTest: boolean,
+  strategy: NonNullable<MountDefinition['strategy']>,
   diffuser?: ReturnType<typeof wandDiffuserEnvelope>,
 ) {
   const { fitClearancePerSideMm: clearance, supportThicknessMm: thickness, retainingLipMm: reach } = parameters;
@@ -46,20 +47,24 @@ export function generateWandMount(
   const lip = aperture.height / 2;
   const top = wandAttachmentBaseZ + 0.6;
   const lensShoulder = lamp.aperture.height / 2 + clearance;
-  // The rails block side spill near the diffuser. Only four flexing tabs extend behind the shoulder.
+  // The front skirts block side spill near the diffuser.
   const innerFront: Point[] = [[lip + 0.05, top], [lip + 0.05, 0], [lensShoulder, -6.5], [shoulder - 1.1, -11]];
   const outerFront: Point[] = [
     [lip + frame - 0.05, top], [lensShoulder + thickness, -6.5], [shoulder - 1.1 + thickness, -11],
   ];
   const skirt = [...innerFront, ...outerFront.slice().reverse()];
-  const clip = [
+  const grip = strategy === 'wand-slide-on' ? [
+    ...innerFront, [shoulder, -16], [shoulder, -23], [shoulder - 0.5, -29], [shoulder - 1.25, -35],
+    [shoulder - 1.85, -38], [shoulder + thickness - 1.85, -38], [shoulder + thickness - 0.6, -34],
+    [shoulder + thickness, -28], [shoulder + thickness, -16], ...outerFront.slice().reverse(),
+  ] as Point[] : [
     ...innerFront, [shoulder, -16], [shoulder, -28], [shoulder - reach, -35],
     [shoulder - reach + 1.3, -38], [shoulder + thickness - 0.4, -38],
     [shoulder + thickness, -35], [shoulder + thickness, -16], ...outerFront.slice().reverse(),
   ] as Point[];
-  const clipLength = 12;
-  const railLength = fitTest ? clipLength + 2 : aperture.width - 2 * aperture.radius;
-  const clipCenters = fitTest ? [0] : [-1, 1].map(sign => sign * (aperture.width / 2 - 30));
+  const gripLength = strategy === 'wand-slide-on' && !fitTest ? 32 : 12;
+  const skirtLength = fitTest ? gripLength + 2 : aperture.width - 2 * aperture.radius;
+  const gripCenters = fitTest ? [0] : [-1, 1].map(sign => sign * (aperture.width / 2 - 30));
   const solids: Manifold[] = [];
   for (const sign of [-1, 1]) {
     function alongLamp(profile: Point[], length: number, center: number) {
@@ -67,8 +72,8 @@ export function generateWandMount(
       if (sign < 0) contour.reverse();
       return extrudeAlongWand(kernel, scope, contour, length, center);
     }
-    solids.push(alongLamp(skirt, railLength, 0));
-    for (const center of clipCenters) solids.push(alongLamp(clip, clipLength, center));
+    solids.push(alongLamp(skirt, skirtLength, 0));
+    for (const center of gripCenters) solids.push(alongLamp(grip, gripLength, center));
   }
   if (fitTest) {
     // Connect the two tabs through a short, open front rim using the production mating profile.

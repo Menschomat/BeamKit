@@ -1,6 +1,6 @@
 import { extraGridPatterns } from './grid-patterns.ts';
 import { p96l } from './p96l.ts';
-import { tl21c, tl21cFlatSideClips, tl21cSideClips } from './tl21c.ts';
+import { tl21c, tl21cFlatSideClips, tl21cSideClips, tl21cSlideOn } from './tl21c.ts';
 import type { AttachmentDefinition, ConnectionDefinition, Field, LampDefinition, MountDefinition } from '../domain/definitions.ts';
 import { gridFields } from '../geometry/profile.ts';
 
@@ -27,7 +27,7 @@ const squareRecessMount: MountDefinition = {
   ...cornerMount, revision: 6, fields: mountFields,
   defaults: { ...cornerMount.defaults, plateClearanceWidthMm: 72 },
 };
-export const mounts: readonly MountDefinition[] = [{ ...squareRecessMount, revision: 7 }, tl21cSideClips];
+export const mounts: readonly MountDefinition[] = [{ ...squareRecessMount, revision: 7 }, tl21cSideClips, tl21cSlideOn];
 export const attachments: readonly AttachmentDefinition[] = [
   { id: 'honeycomb', revision: 3, label: 'Honeycomb', description: 'Restricts spill with open hexagonal cells.',
     fields: [...gridFields.map(field => ({ ...field, ...(field.key === 'depth' ? { min: 4.8 } : field.key === 'frame' ? { min: 1.6 } : {}), unit: 'mm' as const })),
