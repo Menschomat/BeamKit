@@ -6,7 +6,7 @@ import { createDesign } from '../src/domain/project.ts';
 import { generateAssembly } from '../src/generators/assembly.ts';
 const kernel = await Module(); kernel.setup();
 test('ZIP contains only the printable part, resolved project and CC0 dedication', () => {
-  const project = createDesign(); const result = generateAssembly(kernel, project);
+  const project = createDesign('stl'); const result = generateAssembly(kernel, project);
   const zip = exportBundle(project, result); const view = new DataView(zip);
   const entries = new Map<string, Uint8Array>(); let cursor = 0;
   while (view.getUint32(cursor, true) === 0x04034b50) {

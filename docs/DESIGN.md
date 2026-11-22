@@ -8,7 +8,7 @@ viewport. Light and dark modes use related tints and shades. The multicolor
 preview and 3MF use lemon for the outer shell and clips, granite for the inner
 shell, and near black (#202124) for the grid.
 Voice: technical, direct, dimensional; no invented performance or fit claims.
-Primary action: Export STL. Portable backup: Save JSON.
+Primary action: Export 3MF. Portable backup: Save JSON.
 
 The real product UI is the page. A marketing hero, full-screen promotional sections,
 stock photography, animated marketing moments and a sales footer would obstruct the

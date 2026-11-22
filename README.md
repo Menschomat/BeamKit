@@ -2,17 +2,17 @@
 
 Design printable SmallRig P96L accessories in your browser. Use **Attachment
 type** to choose a honeycomb, square or rectangular eggcrate, parallel louvers,
-or a diffusion sheet holder. Adjust the geometry and export one integrated
-STL in millimetres. The current presets place the front face on the print
+or a diffusion sheet holder. Adjust the geometry and export a 3MF or STL in
+millimetres. The current presets place the front face on the print
 bed. Use **Print → Output → Fit coupon only** to test fit with a smaller print.
 
 Rectangular eggcrate and louvers can turn 90° to change the direction of spill
 control. The presets are starting dimensions. Beam angles require measurement.
 
-For an integrated light grid, enable **Print → Multicolor printing** to preview
-and export a 3MF with a near-black grid, a 0.8 mm granite-gray inner shell, and
-a lemon-yellow outer shell with clips. Import the 3MF as one multipart model
-and assign the filaments in your slicer.
+New designs start in multicolor mode. The 3MF contains a near-black grid,
+a 0.8 mm granite-gray inner shell, and a lemon-yellow outer shell with clips.
+Import it as one multipart model and assign the filaments in your slicer.
+Turn off **Print → Multicolor printing** to export one integrated STL.
 
 ## Development
 

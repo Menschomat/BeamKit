@@ -1,7 +1,7 @@
 # Implementation and validation
 
 The local editor supports two integrated P96L accessories, the honeycomb and
-diffusion sheet holder. Its default STL is one connected solid in millimetres,
+diffusion sheet holder. Integrated STL export is one connected solid in millimetres,
 oriented front-face down. The optional fit coupon lives under Advanced test tools.
 The latest mount places four compact hooks in the existing corners and leaves both short edges open between them.
 It includes four front seats and access cutouts based on the reference dimensions.

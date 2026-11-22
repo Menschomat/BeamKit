@@ -26,7 +26,6 @@ function modelXml(buffer: ArrayBuffer) {
 
 test('multicolor regions partition the integrated solid without bulk overlap', () => {
   const project = createDesign();
-  project.export.format = '3mf';
   assert.equal(decodeDesign(encodeDesign(project)).export.format, '3mf');
   for (const edit of [{}, { inset: 4, orientation: 35 }, { opening: 2, depth: 25 }]) {
     Object.assign(project.attachment.parameters, edit);
@@ -51,7 +50,6 @@ test('multicolor regions partition the integrated solid without bulk overlap', (
 
 test('3MF encodes one build object with three named, bed-aligned components', () => {
   const project = createDesign();
-  project.export.format = '3mf';
   const result = generateAssembly(kernel, project);
   const model = modelXml(multicolor3mf(result, 'front-down'));
   assert.match(model, /unit="millimeter"/);
@@ -69,7 +67,6 @@ test('3MF encodes one build object with three named, bed-aligned components', ()
 
 test('square, rectangular and louver presets share the mount and material boundaries', () => {
   const project = createDesign();
-  project.export.format = '3mf';
   const baseline = generateAssembly(kernel, project);
   const baselineVolumes = baseline.regions!.slice(1).map(part => part.volumeMm3);
   for (const attachment of extraGridPatterns) {

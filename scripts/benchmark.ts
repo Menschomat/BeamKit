@@ -11,7 +11,7 @@ const timings: number[] = [], rss: number[] = []; let triangles = 0;
 const runs = Math.min(1000, Math.max(120, Number(process.env.BEAMKIT_BENCHMARK_RUNS) || 120));
 const memorySamples: { run: number; rssBytes: number; heapUsedBytes: number; arrayBufferBytes: number }[] = [];
 for (let i = 0; i < runs; i++) {
-  const start = performance.now(); const result = generateAssembly(kernel, createDesign());
+  const start = performance.now(); const result = generateAssembly(kernel, createDesign('stl'));
   binaryStl(result.parts[0].mesh); timings.push(performance.now() - start); if (i % 10 === 0 && globalThis.gc) globalThis.gc();
   rss.push(process.memoryUsage().rss);
   triangles = result.parts[0].mesh.indices.length / 3;

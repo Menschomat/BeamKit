@@ -4,7 +4,7 @@ for (const width of [320, 390, 640, 768, 900, 1024, 1440]) {
   test(`editor controls and preview remain usable at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/');
-    await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
     await expect(page.locator('.viewport canvas')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     expect(overflow).toBeLessThanOrEqual(1);
@@ -36,7 +36,7 @@ for (const width of [320, 390, 640, 768, 900, 1024, 1440]) {
       await orientation.scrollIntoViewIfNeeded();
       await expect(orientation).toBeVisible();
       await orientation.fill('30');
-      await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
       await stage.scrollIntoViewIfNeeded();
       await page.getByRole('button', { name: 'Print pose', exact: true }).click();
       await expect(page.getByRole('button', { name: 'Print pose', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -55,10 +55,10 @@ test('the header fits at 320px with wider font metrics', async ({ page }) => {
   await page.goto('/');
   await page.addStyleTag({ content: 'html { font-family: monospace; letter-spacing: 0.045em; }' });
   const header = page.getByRole('banner');
-  const exportStl = header.getByRole('button', { name: 'Export STL', exact: true });
-  await expect(exportStl).toBeEnabled();
+  const export3mf = header.getByRole('button', { name: 'Export 3MF', exact: true });
+  await expect(export3mf).toBeEnabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
-  for (const button of [header.getByRole('button', { name: 'Project', exact: true }), exportStl]) {
+  for (const button of [header.getByRole('button', { name: 'Project', exact: true }), export3mf]) {
     await expect(button).toBeInViewport({ ratio: 1 });
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
@@ -68,7 +68,7 @@ for (const width of [390, 1024]) {
   test(`parameter tabs and attachment selector stay fixed at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 650 });
     await page.goto('/');
-    await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
     const panel = page.getByRole('complementary', { name: 'Parameters' });
     await panel.scrollIntoViewIfNeeded();
 
@@ -92,7 +92,7 @@ for (const width of [390, 1024]) {
 test('resizing keeps the settings visible and the preview bounded', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
   const panel = page.getByRole('complementary', { name: 'Parameters' });
   await expect(panel).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });

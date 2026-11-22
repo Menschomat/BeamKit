@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import Module from 'manifold-3d';
 import { generateAssembly } from '../src/generators/assembly.ts';
-import { createDesign, decodeDesign, encodeDesign, validateDesign } from '../src/domain/project.ts';
+import { createDesign, decodeDesign, encodeDesign, supportsMulticolor, validateDesign } from '../src/domain/project.ts';
 import { attachments, historicalMounts, lamps, mountFields } from '../src/catalog/registry.ts';
 import { encodeProject } from '../src/project.ts';
 import { defaultGrid } from '../src/geometry/profile.ts';
@@ -13,6 +13,7 @@ test('integrated P96L accessories and fit tests produce one validated part', () 
     const project = createDesign();
     project.attachment = { id: attachment.id, revision: attachment.revision, parameters: { ...attachment.defaults } };
     project.assembly.mode = mode;
+    if (!supportsMulticolor(project)) project.export.format = 'stl';
     const result = generateAssembly(kernel, project, 4);
     assert.equal(result.projectRevision, 4);
     assert.equal(result.parts.length, 1);
@@ -33,6 +34,7 @@ test('mount and attachment parameter limits remain connected and clear mandatory
   for (const attachment of attachments) for (const field of attachment.fields) for (const value of [field.min, field.max]) {
     const project = createDesign();
     project.attachment = { id: attachment.id, revision: attachment.revision, parameters: { ...attachment.defaults, [field.key]: value } };
+    if (!supportsMulticolor(project)) project.export.format = 'stl';
     if (attachment.id === 'diffusion-sheet-holder' && field.key !== 'depth') project.attachment.parameters.depth = Math.max(project.attachment.parameters.depth, 4.2 + project.attachment.parameters.ledge + 2 * project.attachment.parameters.sheetThickness);
     generateAssembly(kernel, project);
   }
@@ -42,6 +44,7 @@ test('settings preserve revisions and reject unsupported definitions and modes',
   const legacy = decodeDesign(encodeProject(defaultGrid));
   assert.equal(legacy.attachment.revision, project.attachment.revision);
   assert.equal(legacy.assembly.mode, 'integrated');
+  assert.equal(legacy.export.format, 'stl');
   assert.deepEqual(legacy.mount, project.mount);
   assert.deepEqual(legacy.attachment.parameters, { ...project.attachment.parameters, ...defaultGrid });
   generateAssembly(kernel, legacy);
@@ -75,7 +78,7 @@ test('exported geometry leaves USB, controls, dials, screw and the central optic
 });
 
 test('sheet thickness changes the actual retaining-rim geometry', () => {
-  const project = createDesign();
+  const project = createDesign('stl');
   project.attachment = { id: attachments[1].id, revision: attachments[1].revision, parameters: { ...attachments[1].defaults } };
   project.attachment.parameters.depth = 8;
   const first = generateAssembly(kernel, project).parts[0].mesh;
@@ -90,7 +93,7 @@ test('print-optimized honeycomb preserves the footprint and eliminates steep loc
   assert.deepEqual(result.printAnalysis!.degenerateTriangleIndices, []);
   assert.ok(result.printAnalysis!.bedContactAreaMm2 > 1000);
   assert.ok(result.printAnalysis!.maxOverhangDegrees <= 45);
-  const old = createDesign(); old.engine.generatorVersion = '0.2.0';
+  const old = createDesign('stl'); old.engine.generatorVersion = '0.2.0';
   old.mount!.revision = 1;
   old.mount!.parameters = { ...historicalMounts.find(mount => mount.revision === 1)!.defaults };
   old.attachment.revision = 2; old.attachment.parameters.frame = 2;
@@ -129,7 +132,6 @@ test('four corner hooks catch the modeled shoulder and leave the short edges ope
 
 test('the threaded edge clears a flat plate in both mesh exports and the fit coupon', () => {
   const project = createDesign();
-  project.export.format = '3mf';
   project.attachment.parameters.frame = 5;
   const integrated = generateAssembly(kernel, project);
   const previous = generateAssembly(kernel, {
@@ -162,7 +164,7 @@ test('the threaded edge clears a flat plate in both mesh exports and the fit cou
 });
 
 test('upgrading the earlier tab mount preserves current attachment settings and output mode', () => {
-  const old = createDesign();
+  const old = createDesign('stl');
   old.mount!.revision = 3;
   old.mount!.parameters = { ...historicalMounts.find(mount => mount.revision === 3)!.defaults };
   old.assembly.mode = 'fit-test';
@@ -171,5 +173,6 @@ test('upgrading the earlier tab mount preserves current attachment settings and 
   const upgraded = decodeDesign(encodeDesign(old));
   assert.equal(upgraded.mount!.revision, 7);
   assert.equal(upgraded.assembly.mode, 'fit-test');
+  assert.equal(upgraded.export.format, 'stl');
   assert.deepEqual(upgraded.attachment, old.attachment);
 });

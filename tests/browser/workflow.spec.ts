@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test('the assembled preview starts lit and the lamp can be toggled', async ({ page }) => {
   await page.goto('/');
-  const exportStl = page.getByRole('button', { name: 'Export STL', exact: true });
-  await expect(exportStl).toBeEnabled();
+  const export3mf = page.getByRole('button', { name: 'Export 3MF', exact: true });
+  await expect(export3mf).toBeEnabled();
   const canvas = page.locator('.viewport canvas');
   await expect(canvas).toBeVisible();
   await page.getByText('View options', { exact: true }).click();
@@ -14,7 +14,7 @@ test('the assembled preview starts lit and the lamp can be toggled', async ({ pa
   const unlit = await canvas.screenshot();
   await lampOn.check();
   expect((await canvas.screenshot()).equals(unlit)).toBe(false);
-  await expect(exportStl).toBeEnabled();
+  await expect(export3mf).toBeEnabled();
   await page.getByRole('checkbox', { name: 'Lamp reference', exact: true }).uncheck();
   await expect(lampOn).toBeDisabled();
   await page.getByRole('checkbox', { name: 'Lamp reference', exact: true }).check();
@@ -32,9 +32,9 @@ test('theme follows the system until overridden and remembers the choice', async
   const canvas = page.getByRole('region', { name: 'Accessory preview' });
   await expect(root).toHaveCSS('color-scheme', 'dark');
   await expect(canvas).toHaveCSS('background-color', 'rgb(27, 48, 59)');
-  const exportStl = page.getByRole('button', { name: 'Export STL', exact: true });
-  await expect(exportStl).toBeEnabled();
-  await expect(exportStl).toHaveCSS('background-color', 'rgb(243, 227, 8)');
+  const export3mf = page.getByRole('button', { name: 'Export 3MF', exact: true });
+  await expect(export3mf).toBeEnabled();
+  await expect(export3mf).toHaveCSS('background-color', 'rgb(243, 227, 8)');
   await project.click();
   await expect(theme).toHaveValue('system');
   await page.emulateMedia({ colorScheme: 'light' });
@@ -68,8 +68,10 @@ test('integrated design, JSON confirmation, history, fit test, holder, and offli
   const project = page.getByRole('button', { name: 'Project', exact: true });
   const print = page.getByRole('button', { name: 'Print', exact: true });
   const attachment = page.getByLabel('Attachment type', { exact: true });
-  await expect(exportStl).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
   await print.click();
+  await page.getByRole('checkbox', { name: 'Multicolor printing' }).uncheck();
+  await expect(exportStl).toBeEnabled();
   await expect(page.locator('#output-mode')).toHaveValue('integrated');
   await page.getByRole('button', { name: 'Attachment', exact: true }).click();
   await depth.fill('15'); await expect(exportStl).toBeEnabled();
@@ -110,13 +112,13 @@ test('integrated design, JSON confirmation, history, fit test, holder, and offli
 });
 
 test('local projects, invalid dimensions, latest revision, and mobile panels', async ({ page }) => {
-  await page.goto('/'); const exportStl = page.getByRole('button', { name: 'Export STL', exact: true }); await expect(exportStl).toBeEnabled();
+  await page.goto('/'); const export3mf = page.getByRole('button', { name: 'Export 3MF', exact: true }); await expect(export3mf).toBeEnabled();
   const depth = page.getByRole('spinbutton', { name: 'Depth', exact: true });
-  await depth.fill('100'); await expect(exportStl).toBeDisabled(); await expect(depth).toHaveAttribute('aria-invalid', 'true');
+  await depth.fill('100'); await expect(export3mf).toBeDisabled(); await expect(depth).toHaveAttribute('aria-invalid', 'true');
   for (const value of ['10','15','22','12']) await depth.fill(value);
-  await expect(exportStl).toBeEnabled(); await expect(page.getByRole('status')).toContainText('Print geometry ready');
+  await expect(export3mf).toBeEnabled(); await expect(page.getByRole('status')).toContainText('Print geometry ready');
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
-  await page.getByRole('spinbutton', { name: 'Fit clearance per side', exact: true }).fill('0.5'); await expect(exportStl).toBeEnabled();
+  await page.getByRole('spinbutton', { name: 'Fit clearance per side', exact: true }).fill('0.5'); await expect(export3mf).toBeEnabled();
   const project = page.getByRole('button', { name: 'Project', exact: true });
   await project.click();
   await page.getByRole('textbox', { name: 'Project name', exact: true }).fill('Fit trial'); await page.getByRole('button', { name: 'Save locally', exact: true }).click();
@@ -137,7 +139,7 @@ test('storage failure is visible and does not prevent generation or portable exp
     Object.defineProperty(window, 'indexedDB', { value: { open() { throw new Error('Storage denied'); } } });
   });
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
   await expect(page.getByRole('alert')).toContainText(/storage|Autosave/);
   await page.getByRole('button', { name: 'Project', exact: true }).click();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Save JSON', exact: true }).click();
@@ -154,15 +156,15 @@ test('a failed geometry worker load can retry without losing settings', async ({
     };
   });
   await page.goto('/'); await expect(page.getByRole('alert')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Retry generation', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
 });
 
-test('an older autosave opens the current corner model without an upgrade banner', async ({ page }) => {
+test('an older STL autosave opens the current corner model and keeps its format', async ({ page }) => {
   await page.goto('/');
   const exportStl = page.getByRole('button', { name: 'Export STL', exact: true });
-  await expect(exportStl).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
   await expect(page.getByRole('status')).toContainText('Saved locally');
   await page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -177,6 +179,7 @@ test('an older autosave opens the current corner model without an upgrade banner
         const request = store.get('_autosave');
         request.onsuccess = () => {
           const old = JSON.parse(request.result);
+          old.export.format = 'stl';
           old.mount.revision = 6;
           old.mount.parameters.plateClearanceWidthMm = 80;
           old.mount.parameters.engagementMm = 16.5;
@@ -198,10 +201,10 @@ test('an older autosave opens the current corner model without an upgrade banner
   await expect(page.getByRole('spinbutton', { name: 'Plate clearance width', exact: true })).toHaveValue('80');
 });
 
-test('multicolor mode downloads a 3MF, survives reload, and can switch back to STL', async ({ page }) => {
+test('new projects start in multicolor and remember switching to STL', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Print', exact: true }).click();
-  await page.getByRole('checkbox', { name: 'Multicolor printing' }).check();
+  await expect(page.getByRole('checkbox', { name: 'Multicolor printing' })).toBeChecked();
   const export3mf = page.getByRole('button', { name: 'Export 3MF', exact: true });
   await expect(export3mf).toBeEnabled();
   await expect(page.getByText('Inner shell', { exact: true })).toBeVisible();
@@ -213,11 +216,18 @@ test('multicolor mode downloads a 3MF, survives reload, and can switch back to S
   await expect(export3mf).toBeEnabled();
   await page.getByRole('button', { name: 'Print', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Multicolor printing' }).uncheck();
-  await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+  const exportStl = page.getByRole('button', { name: 'Export STL', exact: true });
+  await expect(exportStl).toBeEnabled();
+  await expect(page.getByRole('status')).toContainText('Saved locally');
+  await page.reload();
+  await expect(exportStl).toBeEnabled();
 });
 
 test('pattern switch keeps common dimensions and exports the selected grid', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Print', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Multicolor printing' }).uncheck();
+  await page.getByRole('button', { name: 'Attachment', exact: true }).click();
   const stl = page.getByRole('button', { name: 'Export STL', exact: true });
   await expect(stl).toBeEnabled();
   const pattern = page.getByLabel('Attachment type', { exact: true });

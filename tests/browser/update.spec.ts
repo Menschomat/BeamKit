@@ -32,7 +32,7 @@ test('a real production service-worker update prompts, saves and preserves the d
     await expect(page.getByRole('status')).toContainText('Offline ready');
     await page.reload();
     const depth = page.getByRole('spinbutton', { name: 'Depth', exact: true }); await depth.fill('19');
-    await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
     await expect(page.getByRole('status')).toContainText('Saved locally');
     active = join(temp, 'b');
     await page.evaluate(async () => { const registration = await navigator.serviceWorker.ready; await registration.update(); });
@@ -41,6 +41,6 @@ test('a real production service-worker update prompts, saves and preserves the d
     await expect(depth).toHaveValue('19');
     await update.click();
     await expect(page.locator('meta[name=beamkit-build]')).toHaveAttribute('content', 'b');
-    await expect(depth).toHaveValue('19'); await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+    await expect(depth).toHaveValue('19'); await expect(page.getByRole('button', { name: 'Export 3MF', exact: true })).toBeEnabled();
   } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });

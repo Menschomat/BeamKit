@@ -18,13 +18,13 @@ export const designSchema = z.strictObject({
   export: z.strictObject({ format: z.enum(['stl', '3mf']), quality: z.literal('print'), orientation: z.enum(['front-down', 'assembly']) }),
 });
 export type Design = z.infer<typeof designSchema>;
-export function createDesign(): Design {
+export function createDesign(format: Design['export']['format'] = '3mf'): Design {
   return { format: 'lamp-attachment-project', schemaVersion: 1, units: 'mm', name: 'P96L honeycomb', engine: { ...engine },
     lamp: { id: lamps[0].id, revision: lamps[0].revision },
     mount: { id: mounts[0].id, revision: mounts[0].revision, parameters: { ...mounts[0].defaults } },
     attachment: { id: attachments[0].id, revision: attachments[0].revision, parameters: { ...attachments[0].defaults } },
     assembly: { mode: 'integrated', connection: null },
-    printProfile: { printer: 'bambu-lab', nozzleDiameterMm: 0.4, material: 'unspecified' }, export: { format: 'stl', quality: 'print', orientation: 'front-down' } };
+    printProfile: { printer: 'bambu-lab', nozzleDiameterMm: 0.4, material: 'unspecified' }, export: { format, quality: 'print', orientation: 'front-down' } };
 }
 export const legacyAttachment = { id: 'honeycomb', revision: 1, label: 'Honeycomb · original grid', description: 'Original standalone grid geometry.', fields: gridFields.map(f => ({ ...f, unit: 'mm' as const })), defaults: defaultGrid, supportedApertures: ['rounded-rectangle' as const] };
 export function attachmentDefinition(project: Design) { return resolveDefinition([...attachments, ...historicalAttachments, legacyAttachment], project.attachment); }
@@ -71,7 +71,7 @@ export function decodeDesign(json: string): Design {
   const data = JSON.parse(json);
   if (['beamkit-grid-prototype', 'lightform-grid-prototype'].includes(data?.format)) {
     const parameters = decodeLegacy(json);
-    const project = createDesign();
+    const project = createDesign('stl');
     project.name = 'Imported original grid'; project.mount = null;
     project.attachment = { id: 'honeycomb', revision: 1, parameters };
     project.assembly.mode = 'standalone';
@@ -107,7 +107,7 @@ function useCurrentDesign(project: Design): Design {
   if (!olderAttachment && !olderMount) return project;
 
   const originalGrid = project.attachment.id === 'honeycomb' && project.attachment.revision === 1;
-  const next = createDesign();
+  const next = createDesign('stl');
   next.name = project.name;
   next.lamp = project.lamp;
   next.printProfile = project.printProfile;
