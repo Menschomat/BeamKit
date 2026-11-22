@@ -258,8 +258,8 @@
           {/if}
         </div>
         <div class="pose-toggle" role="group" aria-label="Preview pose">
-          <button aria-pressed={pose === 'assembly'} onclick={() => pose = 'assembly'}>Assembled</button>
-          <button aria-pressed={pose === 'print'} onclick={() => pose = 'print'}>Print pose</button>
+          <button aria-pressed={pose === 'assembly'} onclick={() => pose = 'assembly'}><span>Assembled</span></button>
+          <button aria-pressed={pose === 'print'} onclick={() => pose = 'print'}><span>Print pose</span></button>
         </div>
       </div>
       <div class="preview-area">

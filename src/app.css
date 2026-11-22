@@ -169,21 +169,29 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
 .viewport canvas { display: block; touch-action: none; }
 
 .pose-toggle {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: repeat(2, 76px);
   gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--control-radius);
-  background: var(--color-surface);
 }
 .pose-toggle button {
-  padding: 5px 10px;
-  border-color: transparent;
-  background: transparent;
-  font-size: 13px;
+  display: grid;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--color-muted);
+  font-size: 12px;
   white-space: nowrap;
 }
-.pose-toggle button[aria-pressed=true] { background: var(--field-surface); border-color: var(--color-line); }
+.pose-toggle button, .pose-toggle button:hover:not(:disabled) { background: transparent; }
+.pose-toggle button span {
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  border-radius: var(--control-radius);
+}
+.pose-toggle button:hover span { background: var(--hover-surface); }
+.pose-toggle button[aria-pressed=true] span { background: var(--header-surface); color: var(--header-ink); }
+.pose-toggle button[aria-pressed=true]:hover span { background: var(--header-hover); }
 .check-row { display: flex; align-items: center; min-height: 44px; gap: 8px; cursor: pointer; }
 .stale-badge, .preview-error {
   position: absolute;
@@ -344,8 +352,10 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
   .status-bar a { min-height: 44px; }
 }
 @media (max-width: 600px) {
+  .stage-header { column-gap: 8px; }
   .stage-title { display: block; }
-  .dimensions { font-size: 13px; }
+  .stage-title h1 { font-size: 20px; }
+  .dimensions { font-size: 12px; }
   .settings-body { display: block; }
 }
 @media (max-width: 600px), (max-width: 1000px) and (max-height: 500px) and (orientation: landscape) {
@@ -370,6 +380,9 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
   .app-header { gap: 8px; padding-inline: 12px; }
   .brand, .header-actions { gap: 6px; }
   .header-actions button { padding-inline: 8px; }
+  .stage-header { column-gap: 4px; }
+  .dimensions { font-size: 11px; }
+  .pose-toggle { grid-template-columns: repeat(2, 72px); }
 }
 @media (prefers-reduced-motion: reduce) {
   button { transition: none; }
