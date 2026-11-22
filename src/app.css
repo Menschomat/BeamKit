@@ -130,8 +130,8 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
   gap: 8px 16px;
 }
 .segmented { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
-.segmented button, .settings-tabs button { border-color: transparent; background: transparent; }
-.segmented button[aria-pressed=true], .settings-tabs button[aria-pressed=true] {
+.segmented button { border-color: transparent; background: transparent; }
+.segmented button[aria-pressed=true] {
   background: #fff;
   border-color: var(--color-line);
 }
@@ -167,6 +167,8 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
 .preview-error { color: #903225; }
 
 .settings-panel {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   padding: 12px var(--gutter) 16px;
   border-left: 1px solid var(--color-line);
@@ -174,14 +176,31 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
 }
 .settings-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(max-content, 1.4fr) repeat(2, minmax(max-content, 1fr));
+  flex: none;
   gap: 4px;
-  margin-bottom: 16px;
-  padding: 4px;
-  border-radius: 8px;
-  background: #ebebee;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--color-line);
 }
-.settings-tabs button { min-width: 0; padding-inline: 6px; }
+.settings-tabs button {
+  padding-inline: 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--control-radius) var(--control-radius) 0 0;
+  background: transparent;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.settings-tabs button[aria-pressed=true] { border-bottom-color: #bb4936; color: var(--color-ink); }
+.settings-panel > .parameter { flex: none; }
+.settings-scroll {
+  min-height: 0;
+  margin-inline: -4px;
+  padding: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
 .settings-footer { padding-top: 8px; }
 .section-heading { display: block; margin-bottom: 6px; font-weight: 600; }
 .parameter { padding-bottom: 12px; }
@@ -276,7 +295,6 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
 @media (min-width: 1001px) {
   .app-shell { height: 100dvh; min-height: 540px; }
   .stage, .settings-panel { min-height: 0; }
-  .settings-panel { overflow-y: auto; scrollbar-width: thin; }
 }
 @media (max-width: 1000px) {
   :root { --gutter: 16px; }
@@ -288,15 +306,13 @@ h1 { font-size: clamp(22px, 2vw, 29px); font-weight: 650; line-height: 1.25; let
   .settings-panel {
     display: none;
     max-height: min(48dvh, 450px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
     border-left: 0;
     border-top: 1px solid var(--color-line);
   }
-  .settings-panel.mobile-open { display: block; }
+  .settings-panel.mobile-open { display: flex; }
   input[type=range] { height: 44px; }
   .settings-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
-  .attachment-select, .multicolor-settings, .print-notes { grid-column: 1 / -1; }
+  .multicolor-settings, .print-notes { grid-column: 1 / -1; }
   .status-bar a { min-height: 44px; }
 }
 @media (max-width: 600px) {

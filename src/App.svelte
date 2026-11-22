@@ -261,63 +261,69 @@
           <button aria-pressed={settingsTab === id} onclick={() => settingsTab = id}>{label}</button>
         {/each}
       </div>
-      <div class="settings-body">
-        {#if settingsTab === 'attachment'}
-          <div class="parameter attachment-select">
-            <label class="section-heading" for="attachment">Attachment type</label>
-            <select id="attachment" disabled={booting} value={project.attachment.id}
-              onchange={event => changeAttachment(event.currentTarget.value,
-                isGridPattern(project.attachment.id) && isGridPattern(event.currentTarget.value))}>
-              {#each attachments as attachment}<option value={attachment.id}>{attachment.label}</option>{/each}
-            </select>
-          </div>
-          {#each definition.fields as field (field.key)}
-            <ParameterField {field} value={project.attachment.parameters[field.key]} disabled={booting} prefix="attachment" onchange={value => changeParameter('attachment', field.key, value)} />
-          {/each}
-        {:else if settingsTab === 'mount'}
-          {#if project.assembly.mode !== 'standalone' && project.mount}
-            {#each selectedMount?.fields ?? [] as field}
-              <ParameterField {field} value={project.mount.parameters[field.key]} disabled={booting} prefix="mount" onchange={value => changeParameter('mount', field.key, value)} />
-            {/each}
-          {:else}
-            <p class="field-help">Select a mounted model or fit coupon under Print to adjust lamp fit.</p>
-          {/if}
-        {:else}
-          <div class="parameter">
-            <label for="output-mode" class="section-heading">Output</label>
-            <select id="output-mode" disabled={booting} value={project.assembly.mode} onchange={event => changeMode(event.currentTarget.value as Design['assembly']['mode'])}>
-              <option value="integrated">Mounted accessory</option>
-              <option value="fit-test">Fit coupon only</option>
-              <option value="standalone">Attachment only</option>
-            </select>
-          </div>
-          {#if multicolorAvailable}
-            <div class="multicolor-settings">
-              <label class="check-row"><input type="checkbox" checked={multicolor} disabled={booting} onchange={event => changeMulticolor(event.currentTarget.checked)} /> Multicolor printing</label>
-              {#if multicolor}
-                <ul class="material-key">
-                  {#each Object.values(materialRegions) as region}
-                    <li><i style:background={region.color}></i>{region === materialRegions.honeycomb ? gridMaterialLabel(project.attachment.id) : region.label}</li>
-                  {/each}
-                </ul>
-                <p class="field-help">Assign the three 3MF parts to filaments in your slicer.</p>
+      {#if settingsTab === 'attachment'}
+        <div class="parameter">
+          <label class="section-heading" for="attachment">Attachment type</label>
+          <select id="attachment" disabled={booting} value={project.attachment.id}
+            onchange={event => changeAttachment(event.currentTarget.value,
+              isGridPattern(project.attachment.id) && isGridPattern(event.currentTarget.value))}>
+            {#each attachments as attachment}<option value={attachment.id}>{attachment.label}</option>{/each}
+          </select>
+        </div>
+      {/if}
+      {#key settingsTab}
+        <div class="settings-scroll">
+          <div class="settings-body">
+            {#if settingsTab === 'attachment'}
+              {#each definition.fields as field (field.key)}
+                <ParameterField {field} value={project.attachment.parameters[field.key]} disabled={booting} prefix="attachment" onchange={value => changeParameter('attachment', field.key, value)} />
+              {/each}
+            {:else if settingsTab === 'mount'}
+              {#if project.assembly.mode !== 'standalone' && project.mount}
+                {#each selectedMount?.fields ?? [] as field}
+                  <ParameterField {field} value={project.mount.parameters[field.key]} disabled={booting} prefix="mount" onchange={value => changeParameter('mount', field.key, value)} />
+                {/each}
+              {:else}
+                <p class="field-help">Select a mounted model or fit coupon under Print to adjust lamp fit.</p>
               {/if}
-            </div>
-          {/if}
-          <details class="print-notes">
-            <summary>Print notes</summary>
-            <p>Starting point for a 0.4 mm nozzle on a Bambu Lab printer: front face on the bed, 0.20 mm layers, 4 walls, and 0–10% infill.</p>
-            <div class="parameter">
-              <label for="material" class="section-heading">Planned material</label>
-              <select id="material" value={project.printProfile.material} onchange={event => { remember(); project.printProfile.material = event.currentTarget.value as Design['printProfile']['material']; rebuild(); }}>
-                <option value="unspecified">Choose in slicer</option><option>PLA</option><option>PETG</option><option>ASA</option>
-              </select>
-            </div>
-            {#each diagnostics as note}<p class:warning={note.level === 'warning'}>{note.message}</p>{/each}
-          </details>
-        {/if}
-      </div>
-      <div class="settings-footer"><button class="quiet" disabled={booting} onclick={resetPreset}>Reset preset</button></div>
+            {:else}
+              <div class="parameter">
+                <label for="output-mode" class="section-heading">Output</label>
+                <select id="output-mode" disabled={booting} value={project.assembly.mode} onchange={event => changeMode(event.currentTarget.value as Design['assembly']['mode'])}>
+                  <option value="integrated">Mounted accessory</option>
+                  <option value="fit-test">Fit coupon only</option>
+                  <option value="standalone">Attachment only</option>
+                </select>
+              </div>
+              {#if multicolorAvailable}
+                <div class="multicolor-settings">
+                  <label class="check-row"><input type="checkbox" checked={multicolor} disabled={booting} onchange={event => changeMulticolor(event.currentTarget.checked)} /> Multicolor printing</label>
+                  {#if multicolor}
+                    <ul class="material-key">
+                      {#each Object.values(materialRegions) as region}
+                        <li><i style:background={region.color}></i>{region === materialRegions.honeycomb ? gridMaterialLabel(project.attachment.id) : region.label}</li>
+                      {/each}
+                    </ul>
+                    <p class="field-help">Assign the three 3MF parts to filaments in your slicer.</p>
+                  {/if}
+                </div>
+              {/if}
+              <details class="print-notes">
+                <summary>Print notes</summary>
+                <p>Starting point for a 0.4 mm nozzle on a Bambu Lab printer: front face on the bed, 0.20 mm layers, 4 walls, and 0–10% infill.</p>
+                <div class="parameter">
+                  <label for="material" class="section-heading">Planned material</label>
+                  <select id="material" value={project.printProfile.material} onchange={event => { remember(); project.printProfile.material = event.currentTarget.value as Design['printProfile']['material']; rebuild(); }}>
+                    <option value="unspecified">Choose in slicer</option><option>PLA</option><option>PETG</option><option>ASA</option>
+                  </select>
+                </div>
+                {#each diagnostics as note}<p class:warning={note.level === 'warning'}>{note.message}</p>{/each}
+              </details>
+            {/if}
+          </div>
+          <div class="settings-footer"><button class="quiet" disabled={booting} onclick={resetPreset}>Reset preset</button></div>
+        </div>
+      {/key}
     </aside>
   </main>
   <footer class="status-bar">

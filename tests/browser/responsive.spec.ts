@@ -35,13 +35,39 @@ for (const width of [320, 390, 640, 768, 900, 1024, 1440]) {
     } else {
       await expect(page.getByRole('button', { name: 'Parameters', exact: true })).toBeHidden();
       const panel = page.locator('.settings-panel');
-      expect(await panel.evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
+      expect(await panel.locator('.settings-scroll').evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
       const orientation = panel.getByRole('spinbutton', { name: 'Cell orientation', exact: true });
       await orientation.scrollIntoViewIfNeeded();
       await expect(orientation).toBeVisible();
       const canvasBounds = await page.locator('.viewport canvas').boundingBox();
       expect(canvasBounds!.y + canvasBounds!.height).toBeLessThan(900);
     }
+  });
+}
+
+for (const width of [390, 1024]) {
+  test(`parameter tabs and attachment selector stay fixed at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 650 });
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Export STL', exact: true })).toBeEnabled();
+    if (width === 390) await page.getByRole('button', { name: 'Parameters', exact: true }).click();
+    const panel = page.getByRole('complementary', { name: 'Parameters' });
+    await panel.scrollIntoViewIfNeeded();
+
+    const tabs = panel.getByRole('group', { name: 'Parameter groups' });
+    const attachment = panel.getByLabel('Attachment type', { exact: true });
+    const sliders = panel.locator('.settings-scroll');
+    const tabTop = (await tabs.boundingBox())!.y;
+    const selectorTop = (await attachment.boundingBox())!.y;
+    expect(await sliders.evaluate(element => {
+      element.scrollTop = element.scrollHeight;
+      return element.scrollTop;
+    })).toBeGreaterThan(0);
+    expect((await tabs.boundingBox())!.y).toBe(tabTop);
+    expect((await attachment.boundingBox())!.y).toBe(selectorTop);
+    await tabs.getByRole('button', { name: 'Fit', exact: true }).click();
+    await expect(panel.getByRole('spinbutton', { name: 'Fit clearance per side', exact: true })).toBeInViewport();
+    expect(await sliders.evaluate(element => element.scrollTop)).toBe(0);
   });
 }
 
