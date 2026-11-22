@@ -1,5 +1,27 @@
 import { test, expect } from '@playwright/test';
 
+test('the lamp can light up the assembled preview', async ({ page }) => {
+  await page.goto('/');
+  const exportStl = page.getByRole('button', { name: 'Export STL', exact: true });
+  await expect(exportStl).toBeEnabled();
+  const canvas = page.locator('.viewport canvas');
+  await expect(canvas).toBeVisible();
+  await page.getByText('View options', { exact: true }).click();
+  await page.getByRole('button', { name: 'Front view', exact: true }).click();
+  const lampOn = page.getByRole('checkbox', { name: 'Lamp on', exact: true });
+  await expect(lampOn).not.toBeChecked();
+  const unlit = await canvas.screenshot();
+  await lampOn.check();
+  expect((await canvas.screenshot()).equals(unlit)).toBe(false);
+  await expect(exportStl).toBeEnabled();
+  await page.getByRole('checkbox', { name: 'Lamp reference', exact: true }).uncheck();
+  await expect(lampOn).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Lamp reference', exact: true }).check();
+  await expect(lampOn).toBeChecked();
+  await page.getByRole('button', { name: 'Part only', exact: true }).click();
+  await expect(lampOn).toBeDisabled();
+});
+
 test('theme follows the system until overridden and remembers the choice', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/');

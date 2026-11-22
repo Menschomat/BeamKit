@@ -44,7 +44,7 @@
   let historyItems = $state<{ key: string; project: Design }[]>([]);
   let undoStack = $state<string[]>([]), redoStack = $state<string[]>([]);
   let settingsTab = $state<'attachment' | 'mount' | 'print'>('attachment');
-  let view = $state<ViewOptions>({ mode: 'assembly', lampVisible: true, keepoutsVisible: false, lampOpacity: 0.65 });
+  let view = $state<ViewOptions>({ mode: 'assembly', lampVisible: true, lampOn: false, keepoutsVisible: false, lampOpacity: 0.65 });
   let showSettings = $state(false);
   let host: HTMLDivElement, fileInput: HTMLInputElement;
   let importDialog = $state<HTMLDialogElement>();
@@ -285,6 +285,7 @@
                 <button class="quiet" onclick={() => viewport?.fit()}>Fit view</button>
               </div>
               <label><input type="checkbox" bind:checked={view.lampVisible} /> Lamp reference</label>
+              <label class="lamp-power"><input type="checkbox" bind:checked={view.lampOn} disabled={view.mode !== 'assembly' || !view.lampVisible} /> Lamp on</label>
               <label><input type="checkbox" bind:checked={view.keepoutsVisible} /> Access volumes</label>
               <label class="opacity-control">Lamp opacity<input aria-label="Lamp reference opacity" type="range" min="0.1" max="0.8" step="0.05" bind:value={view.lampOpacity} /></label>
             </div>

@@ -1,7 +1,7 @@
 import {
   AmbientLight, Box3, BoxGeometry, BufferAttribute, BufferGeometry, Color, DirectionalLight,
   EdgesGeometry, ExtrudeGeometry, GridHelper, Group, LineBasicMaterial, LineLoop, LineSegments, Mesh,
-  MeshBasicMaterial, MeshStandardMaterial, Path, PerspectiveCamera, Plane, Scene, Shape, ShapeGeometry,
+  MeshBasicMaterial, MeshStandardMaterial, Path, PerspectiveCamera, Plane, PointLight, Scene, Shape, ShapeGeometry,
   Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -9,7 +9,13 @@ import { lamps } from './catalog/registry.ts';
 import { lampReferenceLines } from './geometry/lamp-reference.ts';
 import { materialRegions } from './domain/materials.ts';
 import type { AssemblyResult } from './generators/assembly.ts';
-export type ViewOptions = { mode: 'assembly' | 'part' | 'section' | 'print'; lampVisible: boolean; keepoutsVisible: boolean; lampOpacity: number };
+export type ViewOptions = {
+  mode: 'assembly' | 'part' | 'section' | 'print';
+  lampVisible: boolean;
+  lampOn: boolean;
+  keepoutsVisible: boolean;
+  lampOpacity: number;
+};
 export function createViewport(host: HTMLElement) {
   const renderer = new WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.localClippingEnabled = true;
@@ -30,6 +36,7 @@ export function createViewport(host: HTMLElement) {
   const apertureLine = new LineBasicMaterial({ color: '#a94635', transparent: true, depthWrite: false });
   const housingTint = new MeshBasicMaterial({ color: '#858791', transparent: true, depthWrite: false });
   const apertureTint = new MeshBasicMaterial({ color: '#ff634a', transparent: true, depthWrite: false });
+  const litAperture = new MeshBasicMaterial({ color: '#fff5db', toneMapped: false });
   const housingDepth = new MeshBasicMaterial({
     transparent: true, colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
   });
@@ -48,8 +55,18 @@ export function createViewport(host: HTMLElement) {
   const housingMesh = new Mesh(housing, housingTint);
   lamp.add(housingMesh);
   const apertureMesh = new Mesh(new ShapeGeometry(new Shape(aperture.map(([x, y]) => new Vector2(x, y)))), apertureTint);
+  apertureMesh.position.z = 0.01;
   apertureMesh.renderOrder = 1;
   lamp.add(apertureMesh);
+  // Spread soft preview lighting across the diffuser to pick out the inner grid walls.
+  const diffuserLights = new Group();
+  for (const x of [-0.27, 0.27]) for (const y of [-0.24, 0.24]) {
+    const glow = new PointLight('#fff1d2', 260, 45);
+    glow.position.set(x * profile.aperture.width, y * profile.aperture.height, -profile.body.depth * 0.7);
+    diffuserLights.add(glow);
+  }
+  diffuserLights.visible = false;
+  scene.add(diffuserLights);
   const bay = profile.detail.leftControlBay;
   const bayPlane = bay ? -profile.body.width / 2 + bay.insetMm : undefined;
   const seamSegments = rearSeam.flatMap((point, i) => {
@@ -151,6 +168,8 @@ export function createViewport(host: HTMLElement) {
         keepoutMaterial.color.set(dark ? '#ff8e79' : '#c04c39');
       }
       lamp.visible = options.lampVisible && options.mode === 'assembly';
+      diffuserLights.visible = lamp.visible && options.lampOn;
+      apertureMesh.material = diffuserLights.visible ? litAperture : apertureTint;
       lines.opacity = options.lampOpacity;
       apertureLine.opacity = options.lampOpacity * 0.85;
       housingTint.opacity = options.lampOpacity * 0.32;
@@ -185,7 +204,7 @@ export function createViewport(host: HTMLElement) {
       resize.disconnect(); controls.dispose(); clearParts(); printMaterials.forEach(printMaterial => printMaterial.dispose());
       const referenceGeometries = new Set(lamp.children.map(object => (object as Mesh | LineLoop | LineSegments).geometry));
       referenceGeometries.forEach(geometry => geometry.dispose());
-      for (const material of [lines, apertureLine, housingTint, apertureTint, housingDepth]) material.dispose();
+      for (const material of [lines, apertureLine, housingTint, apertureTint, litAperture, housingDepth]) material.dispose();
       keepouts.children.forEach(line => (line as LineSegments).geometry.dispose()); keepoutMaterial.dispose();
       floor.geometry.dispose(); floor.material.dispose(); renderer.dispose(); renderer.domElement.remove();
     },
