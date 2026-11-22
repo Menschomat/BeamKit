@@ -302,7 +302,7 @@
               {/each}
             {:else if settingsTab === 'mount'}
               {#if project.assembly.mode !== 'standalone' && project.mount}
-                {#each selectedMount?.fields ?? [] as field}
+                {#each (selectedMount?.fields ?? []).filter(field => field.key !== 'frontClearanceMm' || isGridPattern(project.attachment.id)) as field}
                   <ParameterField {field} value={project.mount.parameters[field.key]} disabled={booting} prefix="mount" onchange={value => changeParameter('mount', field.key, value)} />
                 {/each}
               {:else}

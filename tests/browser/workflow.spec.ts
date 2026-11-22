@@ -10,8 +10,12 @@ test('Neewer selection changes the preview, persists, and exports model-specific
   await lamp.selectOption('neewer.tl21c');
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Neewer TL21C' })).toBeVisible();
-  await expect(page.locator('.dimensions')).toHaveText('221.2 × 46.3 × 52.0 mm');
+  await expect(page.locator('.dimensions')).toHaveText('221.2 × 46.3 × 50.8 mm');
   await expect(page.locator('.viewport canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'Fit', exact: true }).click();
+  const clearance = page.getByRole('spinbutton', { name: 'Diffuser clearance', exact: true });
+  await clearance.fill('1.5');
+  await expect(page.locator('.dimensions')).toHaveText('221.2 × 46.3 × 51.5 mm');
   const gridDownload = page.waitForEvent('download');
   await export3mf.click();
   expect((await gridDownload).suggestedFilename()).toBe('tl21c-honeycomb-multicolor.3mf');

@@ -56,9 +56,19 @@ const fields: readonly Field[] = [
   { key: 'retainingLipMm', label: 'Hook reach', min: 0.8, max: 1.8, step: 0.1, unit: 'mm' },
 ];
 
-export const tl21cSideClips: MountDefinition = {
+export const tl21cFlatSideClips: MountDefinition = {
   id: 'neewer.tl21c.side-clips', revision: 1, label: 'Open-back side clips · prototype',
   strategy: 'wand-side-clips', fields,
   defaults: { fitClearancePerSideMm: 0.35, supportThicknessMm: 2, retainingLipMm: 1.4 },
   supportedApertures: ['rounded-rectangle'],
+};
+
+const frontClearance: Field = {
+  key: 'frontClearanceMm', label: 'Diffuser clearance', min: 0.6, max: 2, step: 0.1, unit: 'mm',
+  help: 'Gap above the curved diffuser for light grids. Check the fit coupon first.',
+};
+
+export const tl21cSideClips: MountDefinition = {
+  ...tl21cFlatSideClips, revision: 2, fields: [...fields, frontClearance],
+  defaults: { ...tl21cFlatSideClips.defaults, frontClearanceMm: 0.8 },
 };

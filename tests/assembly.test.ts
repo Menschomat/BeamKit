@@ -3,7 +3,7 @@ import test from 'node:test';
 import Module from 'manifold-3d';
 import { generateAssembly } from '../src/generators/assembly.ts';
 import { createDesign, decodeDesign, encodeDesign, supportsMulticolor, validateDesign } from '../src/domain/project.ts';
-import { attachments, historicalMounts, lamps, mountFields } from '../src/catalog/registry.ts';
+import { attachments, historicalMounts, lamps, mountFields, resolveDefinition } from '../src/catalog/registry.ts';
 import { encodeProject } from '../src/project.ts';
 import { defaultGrid } from '../src/geometry/profile.ts';
 const kernel = await Module(); kernel.setup();
@@ -95,7 +95,7 @@ test('print-optimized honeycomb preserves the footprint and eliminates steep loc
   assert.ok(result.printAnalysis!.maxOverhangDegrees <= 45);
   const old = createDesign('stl'); old.engine.generatorVersion = '0.2.0';
   old.mount!.revision = 1;
-  old.mount!.parameters = { ...historicalMounts.find(mount => mount.revision === 1)!.defaults };
+  old.mount!.parameters = { ...resolveDefinition(historicalMounts, old.mount!).defaults };
   old.attachment.revision = 2; old.attachment.parameters.frame = 2;
   const baseline = generateAssembly(kernel, old).parts[0];
   const revised = result.parts[0];
@@ -134,8 +134,9 @@ test('the threaded edge clears a flat plate in both mesh exports and the fit cou
   const project = createDesign();
   project.attachment.parameters.frame = 5;
   const integrated = generateAssembly(kernel, project);
+  const previousMount = resolveDefinition(historicalMounts, { id: project.mount!.id, revision: 5 });
   const previous = generateAssembly(kernel, {
-    ...project, mount: { id: project.mount!.id, revision: 5, parameters: { ...historicalMounts.find(mount => mount.revision === 5)!.defaults } },
+    ...project, mount: { id: previousMount.id, revision: previousMount.revision, parameters: { ...previousMount.defaults } },
   });
   project.export.format = 'stl';
   project.assembly.mode = 'fit-test';
@@ -166,7 +167,7 @@ test('the threaded edge clears a flat plate in both mesh exports and the fit cou
 test('upgrading the earlier tab mount preserves current attachment settings and output mode', () => {
   const old = createDesign('stl');
   old.mount!.revision = 3;
-  old.mount!.parameters = { ...historicalMounts.find(mount => mount.revision === 3)!.defaults };
+  old.mount!.parameters = { ...resolveDefinition(historicalMounts, old.mount!).defaults };
   old.assembly.mode = 'fit-test';
   old.attachment.parameters.depth = 10;
   assert.equal(generateAssembly(kernel, old).parts.length, 1);

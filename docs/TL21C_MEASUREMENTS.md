@@ -18,10 +18,15 @@ measurements on the actual lamp. The model and photos stay in the Git-ignored
 
 The part clips over the front with a pair of tapered tabs on each long side.
 Its side skirts limit spill near the lens. The center of the back and both
-threaded end faces stay open. The default honeycomb is about 221.2 × 46.3 × 52 mm.
+threaded end faces stay open. The default honeycomb is about 221.2 × 46.3 × 50.8 mm.
 Allow for the full length and any brim on the slicer's usable bed. The fit
 coupon is about 19.2 × 46.3 × 42.4 mm and uses the same side clip cross-section.
 Both are oriented grille or rim down in the front-down export.
+
+Mounted light grids and their fit coupon follow the estimated diffuser curve on
+the lamp-facing side. **Fit → Diffuser clearance** controls the Z-axis gap and
+defaults to 0.8 mm. Grid exits remain on a flat print face, so the cells are
+deeper toward the sides. The sheet holder retains its flat sheet pocket.
 
 In BeamKit, choose **Project → Lamp → Neewer TL21C**. Choose **Print → Fit coupon
 only**, print it with the intended material and a 0.4 mm nozzle, and try it across

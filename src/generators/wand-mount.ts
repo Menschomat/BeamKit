@@ -2,9 +2,34 @@ import type { Manifold, ManifoldToplevel } from 'manifold-3d';
 import type { LampDefinition } from '../domain/definitions.ts';
 import type { Aperture, Point } from '../geometry/profile.ts';
 import { roundedOutline } from '../geometry/profile.ts';
+import { lampApertureZ } from '../geometry/lamp-reference.ts';
 import type { SolidScope } from '../geometry/solid.ts';
 
 export const wandAttachmentBaseZ = 2;
+
+function extrudeAlongWand(kernel: ManifoldToplevel, scope: SolidScope, profile: Point[], length: number, center: number) {
+  const section = scope.own(new kernel.CrossSection([profile]));
+  const extrusion = scope.own(section.extrude(length));
+  const tilted = scope.own(extrusion.rotate([90, 0, 0]));
+  const aligned = scope.own(tilted.rotate([0, 0, 90]));
+  return scope.own(aligned.translate([center - length / 2, 0, 0]));
+}
+
+export function wandDiffuserEnvelope(kernel: ManifoldToplevel, scope: SolidScope, lamp: LampDefinition, clearance: number) {
+  const half = lamp.aperture.height / 2;
+  const sag = lamp.detail.apertureEdgeDepth ?? 0;
+  const extent = lamp.body.height / 2 + 10;
+  const minZ = clearance - sag;
+  const arch: Point[] = Array.from({ length: 33 }, (_, i) => {
+    const y = half * (1 - i / 16);
+    return [y, lampApertureZ(y, lamp.aperture.height, sag) + clearance];
+  });
+  const contour: Point[] = [
+    [-extent, -lamp.body.depth], [extent, -lamp.body.depth],
+    [extent, minZ], ...arch, [-extent, minZ],
+  ];
+  return { solid: extrudeAlongWand(kernel, scope, contour, lamp.body.width + 4, 0), minZ };
+}
 
 export function generateWandMount(
   kernel: ManifoldToplevel,
@@ -14,6 +39,7 @@ export function generateWandMount(
   frame: number,
   parameters: Record<string, number>,
   fitTest: boolean,
+  diffuser?: ReturnType<typeof wandDiffuserEnvelope>,
 ) {
   const { fitClearancePerSideMm: clearance, supportThicknessMm: thickness, retainingLipMm: reach } = parameters;
   const shoulder = lamp.body.height / 2 + clearance;
@@ -39,11 +65,7 @@ export function generateWandMount(
     function alongLamp(profile: Point[], length: number, center: number) {
       const contour: Point[] = profile.map(([y, z]) => [sign * y, z]);
       if (sign < 0) contour.reverse();
-      const section = scope.own(new kernel.CrossSection([contour]));
-      const extrusion = scope.own(section.extrude(length));
-      const tilted = scope.own(extrusion.rotate([90, 0, 0]));
-      const aligned = scope.own(tilted.rotate([0, 0, 90]));
-      return scope.own(aligned.translate([center - length / 2, 0, 0]));
+      return extrudeAlongWand(kernel, scope, contour, length, center);
     }
     solids.push(alongLamp(skirt, railLength, 0));
     for (const center of clipCenters) solids.push(alongLamp(clip, clipLength, center));
@@ -55,8 +77,10 @@ export function generateWandMount(
       width: 16 + 2 * frame, height: aperture.height + 2 * frame, radius: 1 + frame,
     })]));
     const rim = scope.own(outside.subtract(opening));
-    const rimSolid = scope.own(rim.extrude(2.4));
-    solids.push(scope.own(rimSolid.translate([0, 0, wandAttachmentBaseZ])));
+    const bottom = diffuser?.minZ ?? wandAttachmentBaseZ;
+    const rimSolid = scope.own(rim.extrude(wandAttachmentBaseZ + 2.4 - bottom));
+    const raisedRim = scope.own(rimSolid.translate([0, 0, bottom]));
+    solids.push(diffuser ? scope.own(raisedRim.subtract(diffuser.solid)) : raisedRim);
   }
   return scope.own(kernel.Manifold.union(solids));
 }

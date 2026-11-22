@@ -13,7 +13,7 @@ import type { OverhangReport } from '../geometry/printability.ts';
 import { SolidScope, validateSolid } from '../geometry/solid.ts';
 import type { GridMesh } from '../geometry/protocol.ts';
 import { generateHoneycomb } from './honeycomb.ts';
-import { generateWandMount, wandAttachmentBaseZ } from './wand-mount.ts';
+import { generateWandMount, wandAttachmentBaseZ, wandDiffuserEnvelope } from './wand-mount.ts';
 
 export type PrintablePart = { name: string; mesh: GridMesh; bounds: Bounds; volumeMm3: number; transform: [number, number, number] };
 export type MaterialRegion = PrintablePart & { material: keyof typeof materialRegions };
@@ -67,13 +67,17 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     const aperture = { width: lamp.aperture.width - inset * 2, height: lamp.aperture.height - inset * 2, radius: Math.max(0.5, lamp.aperture.radius - inset) };
     let attachment: Manifold;
     const pattern = project.attachment.id;
+    const clearance = wandMount && project.assembly.mode !== 'standalone' && isGridPattern(pattern)
+      ? project.mount?.parameters.frontClearanceMm : undefined;
+    const diffuser = clearance === undefined ? undefined : wandDiffuserEnvelope(kernel, scope, lamp, clearance);
+    const extraDepth = diffuser && clearance !== undefined ? clearance - diffuser.minZ : 0;
     if (isGridPattern(pattern)) {
       const openings = own(new CrossSection(gridOpenings(pattern, aperture, p)));
       const clipped = own(openings.intersect(section(aperture)));
       // Remove clipped slivers below two nominal nozzle widths from new patterns.
       const holes = pattern === 'honeycomb' ? clipped
         : own(own(own(clipped.offset(-0.4, 'Miter')).offset(0.4, 'Miter')).intersect(clipped));
-      attachment = extrude(own(section({ width: aperture.width + 2 * p.frame, height: aperture.height + 2 * p.frame, radius: aperture.radius + p.frame }).subtract(holes)), p.depth);
+      attachment = extrude(own(section({ width: aperture.width + 2 * p.frame, height: aperture.height + 2 * p.frame, radius: aperture.radius + p.frame }).subtract(holes)), p.depth + extraDepth, -extraDepth);
     } else {
       if (project.attachment.revision >= 2) {
         // Flexible sheet inserts through the front rim and sits in a tapered pocket.
@@ -120,9 +124,14 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     if (project.mount && wandMount && project.assembly.mode !== 'standalone') {
       const fitTest = project.assembly.mode === 'fit-test';
       const frame = isGridPattern(pattern) ? p.frame : p.wall;
-      const cradle = generateWandMount(kernel, scope, lamp, aperture, frame, project.mount.parameters, fitTest);
-      attachmentBaseZ = wandAttachmentBaseZ;
-      solid = fitTest ? cradle : own(cradle.add(own(attachment.translate([0, 0, attachmentBaseZ]))));
+      const cradle = generateWandMount(kernel, scope, lamp, aperture, frame, project.mount.parameters, fitTest, diffuser);
+      attachmentBaseZ = clearance ?? wandAttachmentBaseZ;
+      if (fitTest) solid = cradle;
+      else {
+        const raised = own(attachment.translate([0, 0, attachmentBaseZ]));
+        const grid = diffuser ? own(raised.subtract(diffuser.solid)) : raised;
+        solid = own(cradle.add(grid));
+      }
     } else if (project.mount && project.assembly.mode !== 'standalone') {
       const m = project.mount.parameters;
       const fit = m.fitClearancePerSideMm, thickness = m.supportThicknessMm;
@@ -285,11 +294,13 @@ export function generateAssembly(kernel: ManifoldToplevel, input: Design, projec
     if (dfam && isGridPattern(pattern) && printAnalysis.steepOverhangAreaMm2 > 0.00001) throw new Error('This configuration exceeds the 45-degree front-down print limit. Adjust the frame, depth or fit settings.');
     let regions: MaterialRegion[] | undefined;
     if (project.export.format === '3mf' && project.mount) {
+      // The partition prisms extend past both faces of the already-contoured solid.
+      const allowance = diffuser ? 0.05 : 0;
       const volumeAtOffset = (offset: number) => extrude(section({
         width: aperture.width + 2 * offset,
         height: aperture.height + 2 * offset,
         radius: aperture.radius + offset,
-      }), p.depth + 0.1, attachmentBaseZ);
+      }), p.depth + extraDepth + 0.1 + allowance, attachmentBaseZ - extraDepth - allowance);
       // A 0.4 mm rim joins the grid walls. The next 0.8 mm is the liner.
       // Cutting the same finished solid keeps the regions in contact without overlapping.
       const gridBoundary = volumeAtOffset(0.4);
